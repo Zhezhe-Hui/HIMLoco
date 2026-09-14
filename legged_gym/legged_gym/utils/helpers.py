@@ -118,6 +118,11 @@ def get_load_path(root, load_run=-1, checkpoint=-1):
     if checkpoint==-1:
         models = [file for file in os.listdir(load_run) if 'model' in file]
         models.sort(key=lambda m: '{0:0>15}'.format(m))
+        if len(models) == 0:
+            raise FileNotFoundError(
+                "No model checkpoint found in '{}'. Disable resume/play loading "
+                "or train this experiment until it saves a model_*.pt file.".format(load_run)
+            )
         model = models[-1]
     else:
         model = "model_{}.pt".format(checkpoint) 

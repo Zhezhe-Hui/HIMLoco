@@ -1,0 +1,282 @@
+from legged_gym import LEGGED_GYM_ROOT_DIR
+import os
+
+import isaacgym
+from legged_gym.envs import *
+from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger
+
+import numpy as np
+import torch
+import numpy as np
+from isaacgym.torch_utils import quat_apply
+from isaacgym import gymutil, gymapi
+import matplotlib.pyplot as plt
+from legged_gym.envs.go2.bev_mapper import BEVMapper
+
+class SimplePlanner:
+    def __init__(self,
+                 waypoints,
+                 max_w=1.0,
+                 reach_thresh=0.5,
+                 speed_update_period=2.0,   
+                 v_scale_range=(0.6, 1.0)):  
+
+        self.waypoints = [np.array(wp[:2], dtype=np.float32) for wp in waypoints]
+        self.max_w = max_w
+        self.reach_thresh = reach_thresh
+        self.speed_update_period = speed_update_period
+        self.v_scale_range = v_scale_range
+        self.reset()
+
+    def reset(self):
+        self.current_id = 0
+        self.finished = False
+        self.visited = [False] * len(self.waypoints)
+        self.v_scale = np.random.uniform(*self.v_scale_range)
+        self.last_update_time = 0.0  
+
+    def compute_ut(self, base_pos, base_yaw, t):
+        """
+        t: 当前 Trial 内时间（秒）
+        """
+        if self.finished:
+            return 0.0, 0.0
+        # 每隔 speed_update_period 秒，随机一次速度
+        if t - self.last_update_time >= self.speed_update_period:
+            self.v_scale = np.random.uniform(*self.v_scale_range)
+            self.last_update_time = t
+            # print(f"[Planner] t={t:.2f}s → new v_scale = {self.v_scale:.2f}")
+        # 用 v_scale 调制速度
+        vx = self.v_scale
+
+        pos_xy = base_pos[:2]
+        goal = self.waypoints[self.current_id]
+        delta = goal - pos_xy
+        distance = np.linalg.norm(delta)
+
+        # waypoint 到达逻辑（保持你原来的）
+        if distance < self.reach_thresh:
+            self.visited[self.current_id] = True
+            self.current_id += 1
+            if self.current_id >= len(self.waypoints):
+                self.finished = True
+                return 0.0, 0.0
+            goal = self.waypoints[self.current_id]
+            delta = goal - pos_xy
+
+        desired_yaw = np.arctan2(delta[1], delta[0])
+        yaw_err = desired_yaw - base_yaw
+        yaw_err = (yaw_err + np.pi) % (2 * np.pi) - np.pi
+        wz = np.clip(1.5 * yaw_err, -self.max_w, self.max_w)
+        return vx, wz
+
+class Evaluator:
+    def __init__(self, env, policy, planner,
+                 max_steps=2000,
+                 render=True):
+        self.env = env
+        self.policy = policy
+        self.planner = planner
+        self.max_steps = max_steps
+        self.render = render
+        self._last_drawn_id = -1
+
+        # ⭐ 新增
+        self.bev = BEVMapper(
+            bev_size=6.0,
+            bev_res=0.05,
+            cam_height=0.25,
+            height_margin=0.35
+        )
+    def _compute_metrics(self):
+        """Compute evaluation metrics from self.state_log after one trial"""
+        if len(self.state_log) == 0:
+            return {"speed_mae": 0.0, "energy": 0.0}
+
+        cmd_vx = np.array([s["cmd_vx"] for s in self.state_log])
+        real_vx = np.array([s["real_vx"] for s in self.state_log])
+        torque_cost = np.array([s["torque_cost"] for s in self.state_log])
+
+        speed_mae = np.mean(np.abs(cmd_vx - real_vx))
+        energy = np.mean(torque_cost)
+
+        return {
+            "speed_mae": float(speed_mae),
+            "energy": float(energy),
+        }
+
+    def _handle_fail(self, reason, elapsed_time):
+        print(f"❌ Fail: {reason}")
+        print(f"Time used: {elapsed_time:.2f} seconds")
+
+        metrics = self._compute_metrics()
+        print(f"Speed MAE        : {metrics['speed_mae']:.3f} m/s")
+        print(f"Avg Torque Cost  : {metrics['energy']:.3f}")
+
+        return False, elapsed_time
+    
+    def _handle_success(self, elapsed_time):
+        print("✅ Success: reached all waypoints")
+        print(f"Time used: {elapsed_time:.2f} seconds")
+
+        metrics = self._compute_metrics()
+        print(f"Speed MAE        : {metrics['speed_mae']:.3f} m/s")
+        print(f"Avg Torque Cost  : {metrics['energy']:.3f}")
+
+        return True, elapsed_time
+
+    def _get_base_yaw(self, env_id=0):
+        base_quat = self.env.base_quat[env_id:env_id+1]
+        forward = quat_apply(
+            base_quat,
+            self.env.forward_vec[env_id:env_id+1]
+        )[0]
+        return torch.atan2(forward[1], forward[0]).item()
+
+    def run_single_trial(self, trial_id=0):
+        print(f"\n===== Trial {trial_id} =====")
+        self.planner.reset()
+        self.env.reset()
+        self.state_log = []   # 清空日志
+
+        obs = self.env.get_observations()
+
+        for step in range(self.max_steps):
+            # --- Show depth camera ---
+            actions = self.policy(obs)
+            t = step * self.env.dt
+
+            base_pos = self.env.root_states[0, 0:3].cpu().numpy()
+            base_yaw = self._get_base_yaw(0)
+            vx, wz = self.planner.compute_ut(base_pos, base_yaw, t)
+
+            # 成功
+            if self.planner.finished:
+                elapsed_time = step * self.env.dt
+                return self._handle_success(elapsed_time)
+            # 下发动作
+            self.env.commands[:] = 0.0
+            self.env.commands[0, 0] = vx
+            self.env.commands[0, 2] = wz
+
+            obs, _, _, dones, infos, _, _ = self.env.step(actions)
+            if self.render and hasattr(self.env, "camera_depth_tensor") and self.env.camera_depth_tensor is not None:
+                if step % 5 == 0:
+
+                    # === Follow robot base pose (position + yaw) ===
+                    base_pos = self.env.root_states[0, 0:3].cpu().numpy()
+                    base_yaw = self._get_base_yaw(0)
+
+                    # 相机相对 base 的偏移（base 坐标系）
+                    cam_offset_forward = 0.3
+                    cam_offset_up = 0.25
+                    # base 前向（世界坐标）
+                    fx = np.cos(base_yaw)
+                    fy = np.sin(base_yaw)
+                    # 相机位置（世界坐标）
+                    cam_pos = gymapi.Vec3(
+                        base_pos[0] + cam_offset_forward * fx,
+                        base_pos[1] + cam_offset_forward * fy,
+                        base_pos[2] + cam_offset_up
+                    )
+                    # 相机朝向 = base 前方
+                    look_ahead = 1.0
+                    cam_target = gymapi.Vec3(
+                        base_pos[0] + look_ahead * fx,
+                        base_pos[1] + look_ahead * fy,
+                        base_pos[2] + cam_offset_up
+                    )
+                    self.env.gym.set_camera_location(
+                        self.env.cam_handle,
+                        self.env.cam_env_handle,
+                        cam_pos,
+                        cam_target
+                    )
+                    self.env.gym.render_all_camera_sensors(self.env.sim)
+                    self.env.gym.start_access_image_tensors(self.env.sim)
+
+                    depth = self.env.camera_depth_tensor.detach().cpu().numpy()
+
+                    self.env.gym.end_access_image_tensors(self.env.sim)
+
+                    depth = np.nan_to_num(depth, posinf=0.0, neginf=0.0)
+
+                    depth_raw = depth
+                    depth_pos = np.clip(-depth_raw, 0.0, 5.0)  # 显示用：0~5米正距离
+                    # ===== BEV mapping =====
+                    self.bev.update(depth_pos)
+                    self.bev.visualize()
+
+
+                    if self.im is None:
+                        self.im = self.ax.imshow(depth_pos, cmap="gray", vmin=0.0, vmax=5.0)
+                        self.ax.set_title("Depth (meters, 0~5)")
+                    else:
+                        self.im.set_data(depth_pos)
+                    plt.pause(0.001)
+            # --- 可视化目标点 ---
+            if self.render and self.env.viewer is not None:
+                # 每当 current_id 变化时才 redraw，提高性能
+                if self.planner.current_id != self._last_drawn_id:
+                    self.env.gym.clear_lines(self.env.viewer)
+                    self._draw_waypoints()
+                    self._last_drawn_id = self.planner.current_id
+
+            # 数据记录
+            real_vx = self.env.base_lin_vel[0, 0].detach().item()
+            # 12 个关节的瞬时扭矩（力矩）值 平方和
+            torque = self.env.torques[0].detach().cpu().numpy()
+            torque_cost = np.sum(torque ** 2)
+            self.state_log.append({
+                "cmd_vx": float(self.env.commands[0, 0].item()),
+                "real_vx": real_vx,
+                "torque_cost": torque_cost
+            })
+
+            # 失败：环境终止
+            if dones[0]:
+                elapsed_time = step * self.env.dt
+                return self._handle_fail("environment termination", elapsed_time)
+
+    def run(self, num_trials):
+        success=0
+        success_times = []
+        # ===== 只创建一次窗口 =====
+        plt.ion()
+        self.fig, self.ax = plt.subplots()
+        self.im = None
+        for i in range(num_trials):
+            ok, t = self.run_single_trial(i + 1)
+            if ok:
+                success += 1
+                success_times.append(t)
+        print("\n========== Evaluation Result ==========")
+        print(f"Total trials : {num_trials}")
+        print(f"Successes   : {success}")
+        print(f"Success rate: {success / num_trials:.2f}")
+        return success / num_trials
+
+    def _draw_waypoints(self):
+        for idx, wp in enumerate(self.planner.waypoints):
+            if self.planner.visited[idx]:
+                color = (0, 1, 0)   
+            elif idx == self.planner.current_id:
+                color = (1, 1, 0)   
+            else:
+                color = (1, 0, 0)  
+            sphere_geom = gymutil.WireframeSphereGeometry(
+                radius=0.15,
+                num_lats=8,
+                num_lons=8,
+                pose=None,
+                color=color 
+            )
+            pose = gymapi.Transform()
+            pose.p = gymapi.Vec3(wp[0], wp[1], 0.25)
+            gymutil.draw_lines(
+                sphere_geom,
+                self.env.gym,
+                self.env.viewer,
+                self.env.envs[0],
+                pose
+            )

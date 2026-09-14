@@ -61,6 +61,16 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             'RR_calf_joint': -1.5,    # [rad]
         }
 
+
+    # class terrain(LeggedRobotCfg.terrain):
+    #     # 核心：只保留两种地形，比例可自定义（总和为1.0即可）
+    #     # 地形类型对应关系（按顺序）：
+    #     # [平滑斜坡, 崎岖斜坡, 上坡台阶, 下坡台阶, 离散障碍物]
+    #     terrain_proportions = [0.0, 0.7, 0.0, 0.0, 0.3]  # 崎岖斜坡占70%，离散障碍物占30%
+        
+    #     selected = False  # 必须设为 False，启用混合地形（而非单一地形）
+    #     curriculum = False  # 关闭难度递增（可选，方便固定地形测试）
+
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'

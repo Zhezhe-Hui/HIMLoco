@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
-# 
+#  
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -41,12 +41,12 @@ class LeggedRobotCfg(BaseConfig):
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
         episode_length_s = 20 # episode length in seconds
-
+                                
     class terrain:
         mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
         horizontal_scale = 0.1 # [m]
         vertical_scale = 0.005 # [m]
-        border_size = 25 # [m]
+        border_size = 25 # [m] 地形边缘空白区域
         curriculum = True
         static_friction = 1.0
         dynamic_friction = 1.0
@@ -185,6 +185,26 @@ class LeggedRobotCfg(BaseConfig):
         base_height_target = 1.
         max_contact_force = 100. # forces above this value are penalized
         clearance_height_target = 0.09
+        
+    class static_obstacles:
+        enable = False
+        place_on_terrain = True
+        fix_base_link = True
+        disable_gravity = True
+        collapse_fixed_joints = True
+        replace_cylinder_with_capsule = False
+        flip_visual_attachments = False
+        density = 0.001
+        angular_damping = 0.
+        linear_damping = 0.
+        max_angular_velocity = 1000.
+        max_linear_velocity = 1000.
+        armature = 0.
+        thickness = 0.01
+        static_friction = 1.0
+        dynamic_friction = 1.0
+        restitution = 0.
+        assets = []
 
     class normalization:
         class obs_scales:

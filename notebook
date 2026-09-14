@@ -1,0 +1,27 @@
+升级torch到
+pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
+
+python ./train.py --task=go2 --experiment_name=test --num_env=1024 --max_iterations=1000 --resume --load_run=/home/hzz/project/HIMLoco/legged_gym/logs/go2_new_reward/Nov18_21-02-01_ --checkpoint=1000
+
+python train.py > output.txt 2>&1
+
+python ./play1.py --task=go2 --experiment_name=go2_new_reward --load_run=/home/hzz/project/HIMLoco/legged_gym/logs/go2_new_reward/Dec10_20-00-07_ --num_env=1
+
+tensorboard --logdir=runs
+
+rew_tracking_lin_vel	线性速度跟踪奖励：机器人实际速度与目标速度（x_vel=1.0、y_vel=0.0）的匹配度	奖励（正）	2.0
+rew_tracking_ang_vel	角速度跟踪奖励：机器人实际转弯角速度与目标角速度（yaw_vel=0.0）的匹配度	奖励（正）	0.5
+rew_orientation	姿态惩罚：机器人底盘偏离水平姿态（俯仰角、横滚角）的程度	惩罚（负）	-0.2
+rew_base_height	底盘高度惩罚：机器人底盘高度偏离目标高度（0.30m）的程度	惩罚（负）	-1.0
+rew_collision	碰撞惩罚：机器人机身 / 腿部与障碍物（石头、地形）发生碰撞的频率 / 力度	惩罚（负）	-10.0
+rew_lin_vel_z	z 轴速度惩罚：机器人上下跳动的幅度（z 轴速度越大，惩罚越重）	惩罚（负）	-0.3
+rew_ang_vel_xy	xy 轴角速度惩罚：机器人绕 x/y 轴（俯仰 / 横滚）的晃动幅度	惩罚（负）	-0.05
+rew_dof_pos_limits	关节位置超限惩罚：腿部关节角度超出安全范围的程度	惩罚（负）	-0.5
+rew_dof_error	关节误差惩罚：关节实际位置与目标位置的偏差	惩罚（负）	-0.001
+rew_hip_pos	髋关节位置惩罚：髋关节偏离中性位置的程度	惩罚（负）	-0.6
+rew_joint_power	关节功率惩罚：关节消耗的能量（功率越大，惩罚越重，鼓励节能）	惩罚（负）	-2e-5
+rew_dof_acc	关节加速度惩罚：关节运动的加速度（越大越不平滑，惩罚越重）	惩罚（负）	-2.5e-7
+rew_smoothness	动作平滑惩罚：整体动作的平滑程度（避免急加速 / 急停）	惩罚（负）	-0.01
+rew_symmetry	对称性惩罚：左右腿 / 前后腿动作的对称程度（不对称会影响稳定性）	惩罚（负）	-0.5
+rew_action_rate	动作速率惩罚：控制指令的变化速率（避免频繁大幅调整动作）	惩罚（负）	-0.01
+rew_foot_clearance	脚爪离地惩罚：脚爪离地面的高度（过低易擦地，惩罚越重）	惩罚（负）

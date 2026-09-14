@@ -56,22 +56,42 @@ class Terrain:
         self.border = int(cfg.border_size/self.cfg.horizontal_scale)
         self.tot_cols = int(cfg.num_cols * self.width_per_env_pixels) + 2 * self.border
         self.tot_rows = int(cfg.num_rows * self.length_per_env_pixels) + 2 * self.border
-
-        self.height_field_raw = np.zeros((self.tot_rows , self.tot_cols), dtype=np.int16)
+        self.height_field_raw = np.full((self.tot_rows, self.tot_cols), -1000, dtype=np.int16)
+        # self.height_field_raw = np.zeros((self.tot_rows , self.tot_cols), dtype=np.int16)
         if cfg.curriculum:
             self.curiculum()
         elif cfg.selected:
             self.selected_terrain()
+        elif hasattr(cfg, 'terrain_sequence') and cfg.terrain_sequence is not None:
+            self.sequence_terrain()
         else:    
-            self.randomized_terrain()   
-        
+            self.randomized_terrain()  
+        self.add_all_walls()
         self.heightsamples = self.height_field_raw
         if self.type=="trimesh":
             self.vertices, self.triangles = terrain_utils.convert_heightfield_to_trimesh(   self.height_field_raw,
                                                                                             self.cfg.horizontal_scale,
                                                                                             self.cfg.vertical_scale,
                                                                                             self.cfg.slope_treshold)
-    
+    def add_all_walls(self, thickness_m=1, height_m=4.0):
+        thick_px = int(thickness_m / self.cfg.horizontal_scale)
+        height_px = int(height_m / self.cfg.vertical_scale)
+
+        # 地图大小
+        rows, cols = self.height_field_raw.shape
+
+        # 安全边界——不要和机器人出生点 (center) 重叠
+        margin = int(1.0 / self.cfg.horizontal_scale)   # 1 米安全区
+
+        # 左墙
+        self.height_field_raw[margin:rows-margin, :thick_px] = height_px
+        # 右墙
+        self.height_field_raw[margin:rows-margin, cols-thick_px:] = height_px
+        # 上墙 (top)
+        self.height_field_raw[:thick_px, margin:cols-margin] = height_px
+        # 下墙 (bottom)
+        self.height_field_raw[rows-thick_px:, margin:cols-margin] = height_px
+
     def randomized_terrain(self):
         for k in range(self.cfg.num_sub_terrains):
             # Env coordinates in the world
@@ -81,7 +101,77 @@ class Terrain:
             difficulty = np.random.choice([0.5, 0.75, 0.9])
             terrain = self.make_terrain(choice, difficulty)
             self.add_terrain_to_map(terrain, i, j)
-        
+            
+    def make_terrain_by_id(self, terrain_id, difficulty):
+        terrain = terrain_utils.SubTerrain(
+            "terrain",
+            width=self.width_per_env_pixels,
+            length=self.width_per_env_pixels,
+            vertical_scale=self.cfg.vertical_scale,
+            horizontal_scale=self.cfg.horizontal_scale
+        )
+        # difficulty 建议范围 [0, 1]
+        slope = difficulty * 0.4
+        amplitude = 0.01 + 0.07 * difficulty
+        step_height =+ 0.18 * difficulty
+        discrete_obstacles_height = 0.05 + 0.1 * difficulty
+
+        # ---------------- 地形定义 ----------------
+        if terrain_id == 0:
+            # 0 = 光滑斜坡
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=3.0)
+        elif terrain_id == 1:
+            # 1 = 粗糙斜坡
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=0.5)
+            terrain_utils.random_uniform_terrain(terrain,min_height=-0.05,max_height=0.05,step=0.005,downsampled_scale=0.2)
+        elif terrain_id == 2:
+            # 2 = 下楼梯
+            terrain_utils.pyramid_stairs_terrain(terrain,step_width=0.50,step_height=-abs(step_height),platform_size=3.0)
+        elif terrain_id == 3:
+            # 3 = 上楼梯
+            terrain_utils.pyramid_stairs_terrain(terrain,step_width=0.50,step_height=abs(step_height),platform_size=3.0)
+        elif terrain_id == 4:
+            # 4 = 离散障碍
+            terrain_utils.discrete_obstacles_terrain(terrain, 0.01, 2, 3, 50, platform_size=3.)
+        elif terrain_id == 5:
+            # 5 = 平地
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=0, platform_size=3.) 
+        elif terrain_id == 6:
+            # 6 = 离散高度
+            terrain_utils.random_uniform_terrain(terrain,min_height=0.0,max_height=0.08,step=0.005,downsampled_scale=0.2
+            )
+        elif terrain_id == 7:
+            # 7 = 砖块长条障碍：类似论文图里的小矩形砖/短墙
+            brick_obstacles_terrain(
+                terrain,
+                obstacle_height=getattr(self.cfg, "brick_obstacle_height", 0.22),
+                brick_length=getattr(self.cfg, "brick_length", 1.0),
+                brick_width=getattr(self.cfg, "brick_width", 0.35),
+                num_bricks=getattr(self.cfg, "num_bricks", 70),
+                platform_size=getattr(self.cfg, "brick_platform_size", 2.0),
+                max_yaw=getattr(self.cfg, "brick_max_yaw", 0.35),
+            )
+        else:
+            # 兜底：非法编号 → 平地
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=0.0, platform_size=3.0            )
+        return terrain
+
+    def sequence_terrain(self):
+        seq = self.cfg.terrain_sequence
+
+        for k in range(self.cfg.num_sub_terrains):
+            i, j = np.unravel_index(k, (self.cfg.num_rows, self.cfg.num_cols))
+
+            # 按列 j 取 terrain_id
+            if j < len(seq):
+                terrain_id = seq[i]
+            else:
+                terrain_id = 5  # 不够的列 → 平地
+
+            difficulty = 0.5
+            terrain = self.make_terrain_by_id(terrain_id, difficulty)
+            self.add_terrain_to_map(terrain, i, j)
+    
     def curiculum(self):
         for j in range(self.cfg.num_cols):
             for i in range(self.cfg.num_rows):
@@ -116,16 +206,15 @@ class Terrain:
         amplitude = 0.01 + 0.07 * difficulty
         step_height = 0.05 + 0.18 * difficulty
         discrete_obstacles_height = 0.05 + difficulty * 0.1
-        stepping_stones_size = 1.5 * (1.05 - difficulty)
-        stone_distance = 0.05 if difficulty==0 else 0.1
+
         gap_size = 1. * difficulty
         pit_depth = 1. * difficulty
         if choice < self.proportions[0]:
             if choice < self.proportions[0]/ 2:
-                slope *= -1
+                slope *=  -1
             terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=3.)
         elif choice < self.proportions[1]:
-            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=3.)
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=0.5)
             terrain_utils.random_uniform_terrain(terrain, min_height=-amplitude, max_height=amplitude, step=0.005, downsampled_scale=0.2)
         elif choice < self.proportions[3]:
             if choice<self.proportions[2]:
@@ -134,15 +223,16 @@ class Terrain:
         elif choice < self.proportions[4]:
             num_rectangles = 20
             rectangle_min_size = 1.
-            rectangle_max_size = 2.
+            rectangle_max_size = 3.
             terrain_utils.discrete_obstacles_terrain(terrain, discrete_obstacles_height, rectangle_min_size, rectangle_max_size, num_rectangles, platform_size=3.)
         elif choice < self.proportions[5]:
-            terrain_utils.stepping_stones_terrain(terrain, stone_size=stepping_stones_size, stone_distance=stone_distance, max_height=0., platform_size=4.)
+            slope = 0.0  # 强制坡度为0
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=3.)  # 用平滑地形函数生成平地
         elif choice < self.proportions[6]:
+            terrain_utils.random_uniform_terrain(terrain, min_height=0.0, max_height=0.23, step=0.005, downsampled_scale=0.2)
+        else: 
             gap_terrain(terrain, gap_size=gap_size, platform_size=3.)
-        else:
-            pit_terrain(terrain, depth=pit_depth, platform_size=4.)
-        
+
         return terrain
 
     def add_terrain_to_map(self, terrain, row, col):
@@ -186,3 +276,66 @@ def pit_terrain(terrain, depth, platform_size=1.):
     y1 = terrain.width // 2 - platform_size
     y2 = terrain.width // 2 + platform_size
     terrain.height_field_raw[x1:x2, y1:y2] = -depth
+
+def brick_obstacles_terrain(
+    terrain,
+    obstacle_height=0.22,
+    brick_length=1.0,
+    brick_width=0.35,
+    num_bricks=45,
+    platform_size=2.0,
+    max_yaw=0.35,
+):
+    """Scatter low rectangular brick obstacles on flat terrain.
+
+    The output is still a normal IsaacGym heightfield/trimesh terrain; each
+    brick is rasterized into ``terrain.height_field_raw``.
+    """
+    height = int(obstacle_height / terrain.vertical_scale)
+    length_px = max(1, int(brick_length / terrain.horizontal_scale))
+    width_px = max(1, int(brick_width / terrain.horizontal_scale))
+    platform_px = int(platform_size / terrain.horizontal_scale / 2)
+
+    center_x = terrain.length // 2
+    center_y = terrain.width // 2
+    safe_x1 = center_x - platform_px
+    safe_x2 = center_x + platform_px
+    safe_y1 = center_y - platform_px
+    safe_y2 = center_y + platform_px
+
+    margin = max(length_px, width_px) + 2
+    if terrain.length <= 2 * margin or terrain.width <= 2 * margin:
+        return
+
+    for _ in range(num_bricks):
+        cx = np.random.randint(margin, terrain.length - margin)
+        cy = np.random.randint(margin, terrain.width - margin)
+
+        if safe_x1 <= cx <= safe_x2 and safe_y1 <= cy <= safe_y2:
+            continue
+
+        yaw = np.random.uniform(-max_yaw, max_yaw)
+        if np.random.rand() < 0.5:
+            yaw += np.pi / 2.0
+
+        cos_yaw = np.cos(yaw)
+        sin_yaw = np.sin(yaw)
+
+        half_l = length_px / 2.0
+        half_w = width_px / 2.0
+        radius = int(np.ceil(np.sqrt(half_l ** 2 + half_w ** 2))) + 1
+
+        x1 = max(0, cx - radius)
+        x2 = min(terrain.length, cx + radius + 1)
+        y1 = max(0, cy - radius)
+        y2 = min(terrain.width, cy + radius + 1)
+
+        xs = np.arange(x1, x2) - cx
+        ys = np.arange(y1, y2) - cy
+        grid_x, grid_y = np.meshgrid(xs, ys, indexing="ij")
+
+        local_x = cos_yaw * grid_x + sin_yaw * grid_y
+        local_y = -sin_yaw * grid_x + cos_yaw * grid_y
+        mask = (np.abs(local_x) <= half_l) & (np.abs(local_y) <= half_w)
+
+        terrain.height_field_raw[x1:x2, y1:y2][mask] = height

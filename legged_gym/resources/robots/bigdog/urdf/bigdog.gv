@@ -1,0 +1,41 @@
+digraph G {
+node [shape=box];
+"base_link" [label="base_link"];
+"left_hip_back_Link" [label="left_hip_back_Link"];
+"left_thigh_back_Link" [label="left_thigh_back_Link"];
+"left_calf_back_Link" [label="left_calf_back_Link"];
+"left_hip_front_Link" [label="left_hip_front_Link"];
+"left_thigh_front_Link" [label="left_thigh_front_Link"];
+"left_calf_front_Link" [label="left_calf_front_Link"];
+"right_hip_back_Link" [label="right_hip_back_Link"];
+"right_thigh_back_Link" [label="right_thigh_back_Link"];
+"right_calf_back_Link" [label="right_calf_back_Link"];
+"right_hip_front_Link" [label="right_hip_front_Link"];
+"right_thigh_front_Link" [label="right_thigh_front_Link"];
+"right_calf_front_Link" [label="right_calf_front_Link"];
+node [shape=ellipse, color=blue, fontcolor=blue];
+"base_link" -> "left_hip_back" [label="xyz: -0.27469 0.096882 -0.030328 \nrpy: 0 -0 0"]
+"left_hip_back" -> "left_hip_back_Link"
+"left_hip_back_Link" -> "left_thigh_back" [label="xyz: -0.082 0.019 0 \nrpy: 0 -0 0"]
+"left_thigh_back" -> "left_thigh_back_Link"
+"left_thigh_back_Link" -> "left_calf_back" [label="xyz: -0.11168 0.14195 0.27844 \nrpy: 0 -0 0"]
+"left_calf_back" -> "left_calf_back_Link"
+"base_link" -> "left_hip_front" [label="xyz: 0.29031 0.096882 -0.030328 \nrpy: 0 -0 0"]
+"left_hip_front" -> "left_hip_front_Link"
+"left_hip_front_Link" -> "left_thigh_front" [label="xyz: 0.082 0.019 0 \nrpy: 0 -0 0"]
+"left_thigh_front" -> "left_thigh_front_Link"
+"left_thigh_front_Link" -> "left_calf_front" [label="xyz: -0.11168 0.14195 0.27844 \nrpy: 0 -0 0"]
+"left_calf_front" -> "left_calf_front_Link"
+"base_link" -> "right_hip_back" [label="xyz: -0.27469 -0.098118 -0.030328 \nrpy: 0 -0 0"]
+"right_hip_back" -> "right_hip_back_Link"
+"right_hip_back_Link" -> "right_thigh_back" [label="xyz: -0.082 -0.019 0 \nrpy: 0 -0 0"]
+"right_thigh_back" -> "right_thigh_back_Link"
+"right_thigh_back_Link" -> "right_calf_back" [label="xyz: -0.11168 -0.14195 0.27844 \nrpy: 0 -0 0"]
+"right_calf_back" -> "right_calf_back_Link"
+"base_link" -> "right_hip_front" [label="xyz: 0.29031 -0.098118 -0.030328 \nrpy: 0 -0 0"]
+"right_hip_front" -> "right_hip_front_Link"
+"right_hip_front_Link" -> "right_thigh_front" [label="xyz: 0.082 -0.019 0 \nrpy: 0 -0 0"]
+"right_thigh_front" -> "right_thigh_front_Link"
+"right_thigh_front_Link" -> "right_calf_front" [label="xyz: -0.11168 -0.14195 0.27844 \nrpy: 0 -0 0"]
+"right_calf_front" -> "right_calf_front_Link"
+}

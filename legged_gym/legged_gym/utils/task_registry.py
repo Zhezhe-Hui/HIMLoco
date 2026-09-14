@@ -143,7 +143,7 @@ class TaskRegistry():
         else:
             log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
         
-        train_cfg_dict = class_to_dict(train_cfg)
+        train_cfg_dict = class_to_dict(train_cfg) # 把训练配置类（train_cfg）转换成 Python 字典，方便后续训练器（HIMOnPolicyRunner）读取和使用配置参数。
         runner = HIMOnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
         #save resume path before creating a new log_dir
         resume = train_cfg.runner.resume
