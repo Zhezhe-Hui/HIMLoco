@@ -73,7 +73,15 @@ class Terrain:
                                                                                             self.cfg.horizontal_scale,
                                                                                             self.cfg.vertical_scale,
                                                                                             self.cfg.slope_treshold)
-    def add_all_walls(self, thickness_m=1, height_m=4.0):
+    def add_all_walls(self, thickness_m=None, height_m=None):
+        # 参数可在 config 的 terrain 段调整；None 表示沿用 config 值
+        thickness_m = float(getattr(self.cfg, "wall_thickness_m", 1.0)) \
+            if thickness_m is None else float(thickness_m)
+        height_m = float(getattr(self.cfg, "wall_height_m", 4.0)) \
+            if height_m is None else float(height_m)
+        if not bool(getattr(self.cfg, "wall_enable", True)):
+            return
+
         thick_px = int(thickness_m / self.cfg.horizontal_scale)
         height_px = int(height_m / self.cfg.vertical_scale)
 
@@ -81,7 +89,7 @@ class Terrain:
         rows, cols = self.height_field_raw.shape
 
         # 安全边界——不要和机器人出生点 (center) 重叠
-        margin = int(1.0 / self.cfg.horizontal_scale)   # 1 米安全区
+        margin = int(float(getattr(self.cfg, "wall_margin_m", 1.0)) / self.cfg.horizontal_scale)
 
         # 左墙
         self.height_field_raw[margin:rows-margin, :thick_px] = height_px
@@ -111,35 +119,57 @@ class Terrain:
             horizontal_scale=self.cfg.horizontal_scale
         )
         # difficulty 建议范围 [0, 1]
-        slope = difficulty * 0.4
-        amplitude = 0.01 + 0.07 * difficulty
-        step_height =+ 0.18 * difficulty
-        discrete_obstacles_height = 0.05 + 0.1 * difficulty
+        # 以下系数全部可在 config 的 terrain 段调整（基类给了与原实现一致的默认值）
+        cfg = self.cfg
+        slope = difficulty * float(getattr(cfg, "slope_scale", 0.4))
+        amplitude = float(getattr(cfg, "amplitude_min", 0.01)) \
+            + float(getattr(cfg, "amplitude_scale", 0.07)) * difficulty
+        step_height = float(getattr(cfg, "step_height_scale", 0.18)) * difficulty
+        discrete_obstacles_height = float(getattr(cfg, "discrete_obstacle_base", 0.05)) \
+            + float(getattr(cfg, "discrete_obstacle_scale", 0.1)) * difficulty
+        platform = float(getattr(cfg, "platform_size_default", 3.0))
+        platform_rough = float(getattr(cfg, "platform_size_rough_slope", 0.5))
+        step_w = float(getattr(cfg, "step_width", 0.50))
 
         # ---------------- 地形定义 ----------------
         if terrain_id == 0:
             # 0 = 光滑斜坡
-            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=3.0)
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=platform)
         elif terrain_id == 1:
             # 1 = 粗糙斜坡
-            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=0.5)
-            terrain_utils.random_uniform_terrain(terrain,min_height=-0.05,max_height=0.05,step=0.005,downsampled_scale=0.2)
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=platform_rough)
+            terrain_utils.random_uniform_terrain(
+                terrain,
+                min_height=float(getattr(cfg, "rough_slope_min_height", -0.05)),
+                max_height=float(getattr(cfg, "rough_slope_max_height", 0.05)),
+                step=float(getattr(cfg, "rough_slope_step", 0.005)),
+                downsampled_scale=float(getattr(cfg, "rough_slope_downsample", 0.2)))
         elif terrain_id == 2:
             # 2 = 下楼梯
-            terrain_utils.pyramid_stairs_terrain(terrain,step_width=0.50,step_height=-abs(step_height),platform_size=3.0)
+            terrain_utils.pyramid_stairs_terrain(terrain, step_width=step_w, step_height=-abs(step_height), platform_size=platform)
         elif terrain_id == 3:
             # 3 = 上楼梯
-            terrain_utils.pyramid_stairs_terrain(terrain,step_width=0.50,step_height=abs(step_height),platform_size=3.0)
+            terrain_utils.pyramid_stairs_terrain(terrain, step_width=step_w, step_height=abs(step_height), platform_size=platform)
         elif terrain_id == 4:
             # 4 = 离散障碍
-            terrain_utils.discrete_obstacles_terrain(terrain, 0.01, 2, 3, 50, platform_size=3.)
+            terrain_utils.discrete_obstacles_terrain(
+                terrain,
+                float(getattr(cfg, "discrete_obstacle_height_fixed", 0.01)),
+                int(getattr(cfg, "discrete_rect_min_size", 2)),
+                int(getattr(cfg, "discrete_rect_max_size", 3)),
+                int(getattr(cfg, "discrete_num_rectangles", 50)),
+                platform_size=platform)
         elif terrain_id == 5:
             # 5 = 平地
-            terrain_utils.pyramid_sloped_terrain(terrain, slope=0, platform_size=3.) 
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=0, platform_size=platform)
         elif terrain_id == 6:
             # 6 = 离散高度
-            terrain_utils.random_uniform_terrain(terrain,min_height=0.0,max_height=0.08,step=0.005,downsampled_scale=0.2
-            )
+            terrain_utils.random_uniform_terrain(
+                terrain,
+                min_height=float(getattr(cfg, "height_field_min", 0.0)),
+                max_height=float(getattr(cfg, "height_field_max", 0.08)),
+                step=float(getattr(cfg, "height_field_step", 0.005)),
+                downsampled_scale=float(getattr(cfg, "height_field_downsample", 0.2)))
         elif terrain_id == 7:
             # 7 = 砖块长条障碍：类似论文图里的小矩形砖/短墙
             brick_obstacles_terrain(
@@ -153,22 +183,22 @@ class Terrain:
             )
         else:
             # 兜底：非法编号 → 平地
-            terrain_utils.pyramid_sloped_terrain(terrain, slope=0.0, platform_size=3.0            )
+            terrain_utils.pyramid_sloped_terrain(terrain, slope=0.0, platform_size=platform)
         return terrain
 
     def sequence_terrain(self):
         seq = self.cfg.terrain_sequence
+        fallback_id = int(getattr(self.cfg, "sequence_fallback_terrain_id", 5))
+        difficulty = float(getattr(self.cfg, "sequence_difficulty", 0.5))
 
         for k in range(self.cfg.num_sub_terrains):
             i, j = np.unravel_index(k, (self.cfg.num_rows, self.cfg.num_cols))
 
-            # 按列 j 取 terrain_id
-            if j < len(seq):
-                terrain_id = seq[i]
-            else:
-                terrain_id = 5  # 不够的列 → 平地
+            # 按行 i 取 terrain_id。
+            # 注意：原来这里守卫写的是 `if j < len(seq)` 但取值用 seq[i]，
+            # 索引不一致，一旦 num_rows > len(seq) 就会 IndexError，故统一按 i 判断。
+            terrain_id = seq[i] if i < len(seq) else fallback_id
 
-            difficulty = 0.5
             terrain = self.make_terrain_by_id(terrain_id, difficulty)
             self.add_terrain_to_map(terrain, i, j)
     

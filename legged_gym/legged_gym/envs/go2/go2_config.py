@@ -1,5 +1,8 @@
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 from legged_gym import LEGGED_GYM_ROOT_DIR
+# 场景（石头/树/地形）开关集中在 viz_config.py 第十一节，改那里即可，本文件只负责读取
+from legged_gym.envs.go2 import viz_config as VIZ
+
 class Go2RoughCfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
         num_one_step_observations = 45
@@ -7,13 +10,16 @@ class Go2RoughCfg( LeggedRobotCfg ):
         num_one_step_privileged_obs = 45 + 3 + 3 + 187# additional: base_lin_vel, external_forces, scan_dots
         num_privileged_obs = num_one_step_privileged_obs * 1 
         episode_length_s = 30
-        stuck_time_s = 1.0
+        # stuck_time_s 已移到 viz_config.TERM_STUCK_TIME_S（termination.stuck_time_s）
              
     class static_obstacles(LeggedRobotCfg.static_obstacles):
-        enable = True
+        enable = VIZ.SCENE_ENABLE_TREES
         place_on_terrain = True
         use_env_origin = False
-        assets = [
+        # 性能开关（见 viz_config.py 第十三节）：树的高模 mesh cooking 是构建耗时主因
+        reuse_duplicate_assets = VIZ.SCENE_TREE_REUSE_DUPLICATE_ASSETS
+        vhacd_enabled = VIZ.SCENE_TREE_VHACD
+        _all_assets = [
             {
                 "name": "deadwood",
                 "file": "{LEGGED_GYM_ROOT_DIR}/resources/tree/deadwood/deadwood.urdf",
@@ -44,52 +50,55 @@ class Go2RoughCfg( LeggedRobotCfg ):
                 "scale": 0.15,
             },
         ]
+        # 按 viz_config.SCENE_TREE_WHITELIST 过滤（None = 全部保留）
+        assets = VIZ.resolve_tree_assets(_all_assets)
 
     class stone:
-        enable = True
-        stone_spawn_x = (12.0, 36.0)    #x方向：整个地形的边长
-        stone_spawn_y = (0.0, 12.0)
-        num_stones = 1000
-        scale_min = 0.1     #石头大小
-        scale_max = 0.3 
-        # ===== 新增：固定大石头 =====
+        # ⚠ 全部数值来自 viz_config.py 第十一节，不要在这里改
+        enable = VIZ.SCENE_NUM_STONES > 0
+        stone_spawn_x = VIZ.SCENE_STONE_SPAWN_X     # x 方向撒布范围
+        stone_spawn_y = VIZ.SCENE_STONE_SPAWN_Y     # y 方向撒布范围
 
-        big_stone_scale = 2          # URDF 等比放大
+        # 大小石头数量互相独立（底层按“先大后小”顺序创建 actor）
+        num_big_stones = VIZ.SCENE_NUM_BIG_STONES
+        num_small_stones = VIZ.SCENE_NUM_SMALL_STONES_TOTAL
+        num_stones = VIZ.SCENE_NUM_STONES           # = 大 + 小，底层使用
+        scale_min = VIZ.SCENE_SMALL_STONE_SCALE[0]  # 小碎石缩放
+        scale_max = VIZ.SCENE_SMALL_STONE_SCALE[1]
 
-        big_stone_positions = [
-            # x = 8
-            (8, 1),
-            (8, 5),
-            # (8, 7),
-            (8, 9.4),
-            
-            # # x = 12
-            (12, 2),
-            # (12, 4),
-            # (12, 5),
-            # (12, 8),
-            (12, 10),
-            
-            # x = 16
-            (16, 1),
-            (16, 5),
-            (16, 7),
-            (16, 9.4),
-            
-            # x = 20
-            (20, 2),
-            (20, 4),
-            # (20, 5),
-            (20, 8),
-            (20, 10),
-            
-            # x = 24
-            # (24, 1),
-            # (24, 5),
-            (24, 7),
-            (24, 9.4),
-        ]
-        big_stone_indices = list(range(len(big_stone_positions))) # 第 0/1/2 个 stone 变大
+        big_stone_scale = VIZ.SCENE_BIG_STONE_SCALE  # 大石头 URDF 等比放大
+        big_stone_positions = list(VIZ.SCENE_BIG_STONE_POSITIONS)
+        big_stone_indices = list(VIZ.SCENE_BIG_STONE_INDICES)
+
+        # 性能开关（消除显存吃紧 / 卡顿）
+        density = VIZ.SCENE_STONE_DENSITY
+        small_static = VIZ.SCENE_SMALL_STONES_STATIC
+        small_static_z_offset = VIZ.SCENE_SMALL_STATIC_Z_OFFSET
+        spawn_height_offset = VIZ.SCENE_STONE_SPAWN_HEIGHT
+        small_scale_steps = VIZ.SCENE_SMALL_STONE_SCALE_STEPS
+        small_collision = VIZ.SCENE_SMALL_STONE_COLLISION
+        big_collision = VIZ.SCENE_BIG_STONE_COLLISION
+
+    class spawn(LeggedRobotCfg.spawn):
+        """机器人出生点，全部来自 viz_config.py 第十一·B 节。"""
+        use_env_origins = VIZ.SPAWN_USE_ENV_ORIGINS
+        fixed_position = tuple(VIZ.SPAWN_FIXED_POSITION)
+        origin_xy_jitter = VIZ.SPAWN_ORIGIN_XY_JITTER
+        init_velocity_range = VIZ.SPAWN_INIT_VELOCITY_RANGE
+
+    class camera(LeggedRobotCfg.camera):
+        """深度相机参数，全部来自 viz_config.py 第十四节。"""
+        enable = VIZ.CAM_ENABLE
+        width = VIZ.CAM_WIDTH
+        height = VIZ.CAM_HEIGHT
+        horizontal_fov = VIZ.CAM_HORIZONTAL_FOV
+        forward_offset = VIZ.CAM_INIT_FORWARD
+        lookat_forward_offset = VIZ.CAM_INIT_LOOKAT_FORWARD
+        init_height = VIZ.CAM_INIT_HEIGHT
+        height_offset = VIZ.CAM_FOLLOW_HEIGHT
+
+    class termination(VIZ.TERMINATION_CFG):
+        """终止判定的开关与阈值，全部来自 viz_config.py 第十二节。"""
 
     class terrain( LeggedRobotCfg.terrain ):
         mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
@@ -115,7 +124,36 @@ class Go2RoughCfg( LeggedRobotCfg ):
         # 地形类型索引：
         # 0 = 光滑斜坡   1 = 粗糙斜坡   2 = 下楼梯   3 = 上楼梯
         # 4 = 离散障碍   5 = 平地       6 = 离散高度 7 = 砖块长条障碍
-        terrain_sequence = [4,1,4,1,1,1]
+        # 地形序列来自 viz_config.SCENE_TERRAIN_PRESET（"custom" 或 TERRAIN_IDS 中的名字）
+        terrain_sequence = list(VIZ.SCENE_TERRAIN_SEQUENCE)
+        # 地形形状参数（见 viz_config.py 第十一节）
+        sequence_difficulty = VIZ.TERRAIN_SEQUENCE_DIFFICULTY
+        sequence_fallback_terrain_id = VIZ.TERRAIN_SEQUENCE_FALLBACK_ID
+        slope_scale = VIZ.TERRAIN_SLOPE_SCALE
+        step_width = VIZ.TERRAIN_STEP_WIDTH
+        step_height_scale = VIZ.TERRAIN_STEP_HEIGHT_SCALE
+        platform_size_default = VIZ.TERRAIN_PLATFORM_SIZE
+        platform_size_rough_slope = VIZ.TERRAIN_PLATFORM_SIZE_ROUGH_SLOPE
+        amplitude_min = VIZ.TERRAIN_AMPLITUDE_MIN
+        amplitude_scale = VIZ.TERRAIN_AMPLITUDE_SCALE
+        discrete_obstacle_base = VIZ.TERRAIN_DISCRETE_OBSTACLE_BASE
+        discrete_obstacle_scale = VIZ.TERRAIN_DISCRETE_OBSTACLE_SCALE
+        discrete_obstacle_height_fixed = VIZ.TERRAIN_DISCRETE_HEIGHT_FIXED
+        discrete_rect_min_size = VIZ.TERRAIN_DISCRETE_RECT_MIN
+        discrete_rect_max_size = VIZ.TERRAIN_DISCRETE_RECT_MAX
+        discrete_num_rectangles = VIZ.TERRAIN_DISCRETE_NUM_RECTS
+        height_field_min = VIZ.TERRAIN_HEIGHT_FIELD_MIN
+        height_field_max = VIZ.TERRAIN_HEIGHT_FIELD_MAX
+        height_field_step = VIZ.TERRAIN_HEIGHT_FIELD_STEP
+        height_field_downsample = VIZ.TERRAIN_HEIGHT_FIELD_DOWNSAMPLE
+        rough_slope_min_height = VIZ.TERRAIN_ROUGH_MIN_HEIGHT
+        rough_slope_max_height = VIZ.TERRAIN_ROUGH_MAX_HEIGHT
+        rough_slope_step = VIZ.TERRAIN_ROUGH_STEP
+        rough_slope_downsample = VIZ.TERRAIN_ROUGH_DOWNSAMPLE
+        wall_enable = VIZ.TERRAIN_WALL_ENABLE
+        wall_thickness_m = VIZ.TERRAIN_WALL_THICKNESS_M
+        wall_height_m = VIZ.TERRAIN_WALL_HEIGHT_M
+        wall_margin_m = VIZ.TERRAIN_WALL_MARGIN_M
         # 砖块长条障碍参数，单位都是米。高度建议先从 0.18~0.25 训练。
         brick_obstacle_height = 0.1
         brick_length = 1.0

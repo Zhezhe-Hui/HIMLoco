@@ -102,32 +102,60 @@ def parse_sim_params(args, cfg):
     return sim_params
 
 def get_load_path(root, load_run=-1, checkpoint=-1):
-    try:
-        runs = os.listdir(root)
-        #TODO sort by date to handle change of month
-        runs.sort()
-        if 'exported' in runs: runs.remove('exported')
-        last_run = os.path.join(root, runs[-1])
-    except:
-        raise ValueError("No runs in this directory: " + root)
-    if load_run==-1:
+    """Resolve the checkpoint path to resume/play from.
+
+    load_run:
+      -1            -> latest run under ``root`` (original behaviour)
+      "Sep15_..._"  -> a run directory name under ``root``
+      "/abs/path"   -> an absolute run directory (os.path.join keeps it as-is)
+    checkpoint:
+      -1  -> the highest-numbered model_*.pt in that run
+      N   -> model_<N>.pt
+    """
+    if load_run == -1:
+        try:
+            runs = os.listdir(root)
+            if 'exported' in runs: runs.remove('exported')
+            # Pick the most recently modified run instead of the alphabetically
+            # last one. Directory names look like "Sep15_12-14-31_", so a plain
+            # string sort silently crosses month boundaries (Sep* > Dec*) and
+            # picks the wrong checkpoint.
+            runs = [r for r in runs if os.path.isdir(os.path.join(root, r))]
+            runs.sort(key=lambda r: os.path.getmtime(os.path.join(root, r)))
+            if len(runs) == 0:
+                raise ValueError("No runs in this directory: " + root)
+            last_run = os.path.join(root, runs[-1])
+        except:
+            raise ValueError("No runs in this directory: " + root)
         load_run = last_run
     else:
+        # Only scan `root` when we actually need the default run; an explicitly
+        # given load_run may live anywhere, so an empty/rootless `root` is fine.
         load_run = os.path.join(root, load_run)
 
-    if checkpoint==-1:
+    if checkpoint == -1:
         models = [file for file in os.listdir(load_run) if 'model' in file]
-        models.sort(key=lambda m: '{0:0>15}'.format(m))
         if len(models) == 0:
             raise FileNotFoundError(
                 "No model checkpoint found in '{}'. Disable resume/play loading "
                 "or train this experiment until it saves a model_*.pt file.".format(load_run)
             )
+        # Sort numerically by iteration so model_99.pt < model_1200.pt.
+        # The old string zero-pad key only worked by accident and misorders
+        # checkpoints once the iteration count crosses a digit boundary.
+        def _iter_of(name):
+            digits = ''.join(ch for ch in name if ch.isdigit())
+            return int(digits) if digits else -1
+        models.sort(key=_iter_of)
         model = models[-1]
     else:
-        model = "model_{}.pt".format(checkpoint) 
+        model = "model_{}.pt".format(checkpoint)
 
     load_path = os.path.join(load_run, model)
+    if not os.path.isfile(load_path):
+        raise FileNotFoundError(
+            "Checkpoint '{}' does not exist. Check POLICY_LOAD_RUN / "
+            "POLICY_CHECKPOINT in envs/go2/viz_config.py (or --load_run/--checkpoint).".format(load_path))
     return load_path
 
 def update_cfg_from_args(env_cfg, cfg_train, args):

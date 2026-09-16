@@ -172,29 +172,42 @@ class LeggedRobot(BaseTask):
     def check_termination(self):
         """
         Check if environments need to be reset
+
+        各项终止条件的开关与阈值都来自 cfg.termination（集中配置，勿在此硬编码）。
         """
+        term_cfg = getattr(self.cfg, "termination", None)
         # 1️碰撞终止
-        collision = torch.any(
-            torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1.0,
-            dim=1
-        )
+        if term_cfg is None or getattr(term_cfg, "enable_collision", True):
+            threshold = float(getattr(term_cfg, "collision_force_threshold", 1.0)) \
+                if term_cfg is not None else 1.0
+            collision = torch.any(
+                torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > threshold,
+                dim=1
+            )
+        else:
+            collision = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         # 2️超时终止
-        self.time_out_buf = self.episode_length_buf > self.max_episode_length
+        if term_cfg is None or getattr(term_cfg, "enable_timeout", True):
+            self.time_out_buf = self.episode_length_buf > self.max_episode_length
+        else:
+            self.time_out_buf = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         # 3️悬崖 / 掉落
-        cliff_fall = self.root_states[:, 2] < -0.5
+        if term_cfg is not None and getattr(term_cfg, "enable_cliff_fall", True):
+            cliff_fall = self.root_states[:, 2] < float(getattr(term_cfg, "cliff_fall_height", -0.5))
+        else:
+            cliff_fall = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         # 4️被卡住终止
-        # --------------------------------------------------
-        # 命令线速度大小
-        cmd_speed = torch.norm(self.commands[:, :2], dim=1)
-        # 实际线速度大小
-        actual_speed = torch.norm(self.base_lin_vel[:, :2], dim=1)
-        # 判断是否“应该在动但没动”
-        stuck_mask = (cmd_speed > 0.3) & (actual_speed < 0.05)
-        # 计数器累积
-        self.stuck_counter[stuck_mask] += 1
-        self.stuck_counter[~stuck_mask] = 0
-        stuck = self.stuck_counter > self.stuck_steps_threshold
-        # --------------------------------------------------
+        if term_cfg is not None and getattr(term_cfg, "enable_stuck", True):
+            cmd_speed = torch.norm(self.commands[:, :2], dim=1)
+            actual_speed = torch.norm(self.base_lin_vel[:, :2], dim=1)
+            # 判断是否“应该在动但没动”
+            stuck_mask = (cmd_speed > float(getattr(term_cfg, "stuck_cmd_speed_min", 0.3))) & \
+                         (actual_speed < float(getattr(term_cfg, "stuck_actual_speed_max", 0.05)))
+            self.stuck_counter[stuck_mask] += 1
+            self.stuck_counter[~stuck_mask] = 0
+            stuck = self.stuck_counter > self.stuck_steps_threshold
+        else:
+            stuck = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         # 汇总所有终止条件
         self.reset_buf = collision | self.time_out_buf | cliff_fall | stuck
 
@@ -578,19 +591,30 @@ class LeggedRobot(BaseTask):
 
             robot_states_update = self.base_init_state.unsqueeze(0).repeat(num_resets, 1)
 
-            # if self.custom_origins:
-            #     robot_states_update[:, :3] += self.env_origins[env_ids]
-            #     xy_offset = (torch.rand(num_resets, 2, device=self.device) * 2.0) - 1.0
-            #     robot_states_update[:, :2] += xy_offset
-            # else:
-            #     robot_states_update[:, :3] += self.env_origins[env_ids]
-            x0, y0, z0 = 6.0, 9.0, 0.4
-            # x0, y0, z0 = 8.0, 6.0, 0.4
-            robot_states_update[:, 0] = x0
-            robot_states_update[:, 1] = y0
-            robot_states_update[:, 2] = z0
+            # 出生点开关见 cfg.spawn（go2 由 viz_config.SPAWN_* 提供）
+            spawn_cfg = getattr(self.cfg, "spawn", None)
+            use_origins = bool(getattr(spawn_cfg, "use_env_origins", False)) \
+                if spawn_cfg is not None else False
+            if use_origins:
+                robot_states_update[:, :3] += self.env_origins[env_ids]
+                jitter = float(getattr(spawn_cfg, "origin_xy_jitter", 1.0))
+                if jitter > 0:
+                    xy_offset = ((torch.rand(num_resets, 2, device=self.device) * 2.0)
+                                 - 1.0) * jitter
+                    robot_states_update[:, :2] += xy_offset
+            else:
+                # 固定出生点：导航评测需要每次 trial 起点一致
+                fixed = tuple(getattr(spawn_cfg, "fixed_position", (6.0, 9.0, 0.4))
+                              if spawn_cfg is not None else (6.0, 9.0, 0.4))
+                robot_states_update[:, 0] = float(fixed[0])
+                robot_states_update[:, 1] = float(fixed[1])
+                robot_states_update[:, 2] = float(fixed[2])
 
-            robot_states_update[:, 7:13] = torch.rand(num_resets, 6, device=self.device) - 0.5
+            vel_range = float(getattr(spawn_cfg, "init_velocity_range", 1.0)) \
+                if spawn_cfg is not None else 1.0
+            if vel_range > 0:
+                robot_states_update[:, 7:13] = \
+                    (torch.rand(num_resets, 6, device=self.device) - 0.5) * vel_range
             self.all_root_states[robot_indices] = robot_states_update
 
             # === 2. 更新物理引擎 ===
@@ -704,10 +728,83 @@ class LeggedRobot(BaseTask):
         return noise_vec
 
     def _get_num_stones(self):
+            """石头总数 = 大石头 + 小碎石。
+
+            优先用解耦后的 num_big_stones / num_small_stones；
+            若旧配置只给了 num_stones，则退回按 big_stone_indices 推断大石头数。
+            """
             stone_cfg = getattr(self.cfg, "stone", None)
             if stone_cfg is None or not getattr(stone_cfg, "enable", False):
                 return 0
+            num_big = getattr(stone_cfg, "num_big_stones", None)
+            num_small = getattr(stone_cfg, "num_small_stones", None)
+            if num_big is not None and num_small is not None:
+                return max(0, int(num_big)) + max(0, int(num_small))
             return int(getattr(stone_cfg, "num_stones", 0))
+
+    def _stone_cfg_get(self, name, default=None):
+            """读取 cfg.stone 上的可选字段，缺失时返回 default。"""
+            stone_cfg = getattr(self.cfg, "stone", None)
+            if stone_cfg is None:
+                return default
+            return getattr(stone_cfg, name, default)
+
+    def _get_num_big_stones(self):
+            """固定大石头的数量。
+
+            大石头占 num_stones 序列的前 N 个索引，且必须存在对应位置，
+            因此取 big_stone_indices 与 big_stone_positions 的交集长度，避免越界。
+            """
+            if not self._stone_cfg_get("enable", False):
+                return 0
+            # 解耦后的大石头数量优先；否则退回 big_stone_indices 与位置的交集
+            num_big = self._stone_cfg_get("num_big_stones", None)
+            positions = self._stone_cfg_get("big_stone_positions", []) or []
+            if num_big is not None:
+                return max(0, min(int(num_big), len(positions)))
+            indices = self._stone_cfg_get("big_stone_indices", []) or []
+            return min(len(indices), len(positions))
+
+    def _apply_stone_collision_options(self, options, kind):
+            """按配置调整石头碰撞体开销（mesh 碰撞非常贵，可用 VHACD 凸分解替代）。
+
+            kind: "small" 或 "big"，分别对应 cfg.stone.small_collision / big_collision。
+            取值:
+              "mesh"  直接用 URDF 里的三角面网格做碰撞（最贵，最贴近外形）
+              "vhacd" 凸分解（折中， PhysX 对凸体有专门的快速通道）
+              其它值  不做额外设置，沿用 IsaacGym 默认行为
+            """
+            mode = str(self._stone_cfg_get(f"{kind}_collision",
+                                           "mesh" if kind == "big" else "vhacd")).lower()
+            if mode == "vhacd" and getattr(options, "vhacd_enabled", None) is not None:
+                options.vhacd_enabled = True
+                params = getattr(options, "vhacd_params", None)
+                cfg_params = self._stone_cfg_get(f"{kind}_vhacd_params", {}) or {}
+                if params is not None:
+                    for key, value in cfg_params.items():
+                        if hasattr(params, key):
+                            setattr(params, key, value)
+            return mode
+
+    def _quantize_stone_scale(self, scale, kind):
+            """把连续随机缩放量化到有限档位。
+
+            IsaacGym/PhysX 为每种 actor scale 生成并缓存独立碰撞几何，
+            连续 scale 会导致每个石头都新建一份，显存与构建时间线性膨胀。
+            量化成 N 档后可大量复用缓存（N=0 表示不量化，保持原行为）。
+            """
+            steps = int(self._stone_cfg_get(f"{kind}_scale_steps", 0) or 0)
+            if steps <= 0:
+                return float(scale)
+            s_min = float(self._stone_cfg_get("scale_min", 0.1))
+            s_max = float(self._stone_cfg_get("scale_max", 0.3))
+            if kind == "big":
+                return float(scale)
+            if s_max <= s_min:
+                return float(scale)
+            idx = int(round((float(scale) - s_min) / (s_max - s_min) * steps))
+            idx = min(max(idx, 0), steps)
+            return s_min + (s_max - s_min) * idx / steps
 
     #----------------------------------------
     def _init_buffers(self):
@@ -947,8 +1044,23 @@ class LeggedRobot(BaseTask):
             "armature",
             "thickness",
             "disable_gravity",
+            "vhacd_enabled",
+            "convex_decomposition_from_submeshes",
         ]:
-            setattr(asset_options, attr, self._cfg_get(spec, attr, self._cfg_get(cfg, attr)))
+            value = self._cfg_get(spec, attr, self._cfg_get(cfg, attr))
+            if value is None or not hasattr(asset_options, attr):
+                continue
+            setattr(asset_options, attr, value)
+
+        # 树的 collision mesh 动辄几十万三角面，PhysX cooking 极慢（实测 4 棵树 ~38s）。
+        # 需要时可在这里透传 vhacd_params 做凸分解，或降低 vhacd 分辨率。
+        vhacd_params = self._cfg_get(spec, "vhacd_params", self._cfg_get(cfg, "vhacd_params"))
+        if vhacd_params and getattr(asset_options, "vhacd_enabled", False):
+            params = getattr(asset_options, "vhacd_params", None)
+            if params is not None:
+                for key, value in dict(vhacd_params).items():
+                    if hasattr(params, key):
+                        setattr(params, key, value)
         return asset_options
 
     def _load_static_obstacle_assets(self):
@@ -956,6 +1068,13 @@ class LeggedRobot(BaseTask):
         obstacle_cfg = getattr(self.cfg, "static_obstacles", None)
         if obstacle_cfg is None or not getattr(obstacle_cfg, "enable", False):
             return
+
+        # 同一个 URDF 常被多个 spec 引用（例如两棵 snow_tree）。高模 mesh 的
+        # PhysX cooking 每次都要重新做一遍，实测单棵树就要 7~13s，因此按
+        # (文件, asset options, 摩擦/弹性) 缓存已加载的 asset 句柄复用。
+        asset_cache = {}
+        if not bool(getattr(obstacle_cfg, "reuse_duplicate_assets", True)):
+            asset_cache = None
 
         for spec in getattr(obstacle_cfg, "assets", []):
             positions = self._cfg_get(spec, "positions", [])
@@ -969,15 +1088,31 @@ class LeggedRobot(BaseTask):
             asset_path = asset_file_cfg.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
             asset_root = os.path.dirname(asset_path)
             asset_file = os.path.basename(asset_path)
-            asset = self.gym.load_asset(self.sim, asset_root, asset_file, self._get_static_obstacle_asset_options(spec))
-
-            rigid_shape_props = self.gym.get_asset_rigid_shape_properties(asset)
+            asset_options = self._get_static_obstacle_asset_options(spec)
             friction = self._cfg_get(spec, "static_friction", getattr(obstacle_cfg, "static_friction", self.cfg.terrain.static_friction))
             restitution = self._cfg_get(spec, "restitution", getattr(obstacle_cfg, "restitution", self.cfg.terrain.restitution))
-            for shape_prop in rigid_shape_props:
-                shape_prop.friction = friction
-                shape_prop.restitution = restitution
-            self.gym.set_asset_rigid_shape_properties(asset, rigid_shape_props)
+
+            cache_key = None
+            if asset_cache is not None:
+                # friction/restitution 通过 set_asset_rigid_shape_properties 作用在整个
+                # asset 上，所以必须参与缓存键，否则复用会串改上一个 spec 的材质。
+                cache_key = (asset_path, friction, restitution,
+                             tuple(getattr(asset_options, attr, None) for attr in (
+                                 "collapse_fixed_joints", "replace_cylinder_with_capsule",
+                                 "flip_visual_attachments", "fix_base_link", "density",
+                                 "armature", "thickness", "disable_gravity",
+                                 "vhacd_enabled", "convex_decomposition_from_submeshes")))
+                if cache_key in asset_cache:
+                    asset, num_bodies = asset_cache[cache_key]
+                else:
+                    asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
+                    num_bodies = self._apply_static_obstacle_material(
+                        asset, obstacle_cfg, friction, restitution)
+                    asset_cache[cache_key] = (asset, num_bodies)
+            else:
+                asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
+                num_bodies = self._apply_static_obstacle_material(
+                    asset, obstacle_cfg, friction, restitution)
 
             self.static_obstacle_specs.append({
                 "asset": asset,
@@ -989,8 +1124,17 @@ class LeggedRobot(BaseTask):
                 "use_env_origin": self._cfg_get(spec, "use_env_origin", getattr(obstacle_cfg, "use_env_origin", False)),
                 "collision_filter": int(self._cfg_get(spec, "collision_filter", 0)),
                 "segmentation_id": int(self._cfg_get(spec, "segmentation_id", 0)),
-                "num_bodies": self.gym.get_asset_rigid_body_count(asset),
+                "num_bodies": num_bodies,
             })
+
+    def _apply_static_obstacle_material(self, asset, obstacle_cfg, friction, restitution):
+        """设置摩擦力/弹性，返回刚体数量。抽出来是为了 asset 缓存复用。"""
+        rigid_shape_props = self.gym.get_asset_rigid_shape_properties(asset)
+        for shape_prop in rigid_shape_props:
+            shape_prop.friction = friction
+            shape_prop.restitution = restitution
+        self.gym.set_asset_rigid_shape_properties(asset, rigid_shape_props)
+        return self.gym.get_asset_rigid_body_count(asset)
 
     def _get_terrain_height_at(self, x, y):
         if not hasattr(self, "terrain") or self.height_samples is None:
@@ -1053,46 +1197,46 @@ class LeggedRobot(BaseTask):
         self.camera_depth_tensor = None
 
         num_stones = self._get_num_stones()
+        num_big_stones = self._get_num_big_stones()
+        num_small_stones = max(0, num_stones - num_big_stones)
+        self.num_big_stones = num_big_stones
+        self.num_small_stones = num_small_stones
         stone_asset = None
         big_stone_asset = None
         if num_stones > 0:
-            # === 新增：加载 Stone Asset ===
-            stone_asset_options = gymapi.AssetOptions()
-            stone_asset_options.disable_gravity = False
-            stone_asset_options.density = 1000.0  # 或者使用 urdf 中的 mass
-            
-            # 假设 stone.urdf 在 resources/stone/stone.urdf
-            # 请根据你的实际路径修改，这里使用了 LEGGED_GYM_ROOT_DIR
-            stone_asset_path = os.path.join(LEGGED_GYM_ROOT_DIR, "resources/stone/stone.urdf")
-            stone_root = os.path.dirname(stone_asset_path)
-            
-            # 小石头
-            stone_asset = self.gym.load_asset(
-                self.sim,
-                stone_root,
-                "stone.urdf",
-                stone_asset_options
-            )
+            stone_root = os.path.dirname(
+                os.path.join(LEGGED_GYM_ROOT_DIR, self._stone_cfg_get("small_urdf",
+                                                                       "resources/stone/stone.urdf")))
 
-            # 大石头（静态 + 贴图）
-            big_stone_options = gymapi.AssetOptions()
-            big_stone_options.fix_base_link = True
-            big_stone_options.disable_gravity = True
+            # 小碎石。默认静态化（fix_base_link + disable_gravity）：
+            # 动态 mesh 刚体是 PhysX 里最贵的组合，985 个/env 时显存与 step 时间都会爆炸。
+            small_static = self._stone_cfg_get("small_static", True)
+            small_options = gymapi.AssetOptions()
+            small_options.fix_base_link = bool(small_static)
+            small_options.disable_gravity = bool(small_static)
+            small_options.density = float(self._stone_cfg_get("density", 1000.0))
+            # 连续随机 scale 会让每个石头生成独立碰撞几何；量化成有限档位可复用缓存
+            self._apply_stone_collision_options(small_options, "small")
+            if num_small_stones > 0:
+                stone_asset = self.gym.load_asset(self.sim, stone_root, "stone.urdf", small_options)
 
-            big_stone_asset = self.gym.load_asset(
-                self.sim,
-                stone_root,
-                "stone_big.urdf",   #  指向带 png 的 URDF
-                big_stone_options
-            )
-            small_stone_body_count = self.gym.get_asset_rigid_body_count(stone_asset)
-            big_stone_body_count = self.gym.get_asset_rigid_body_count(big_stone_asset)
-            big_ids_for_count = getattr(self.cfg.stone, "big_stone_indices", [])
-            self.num_stone_bodies = small_stone_body_count
-            self.num_stone_bodies_total = sum(
-                big_stone_body_count if s in big_ids_for_count else small_stone_body_count
-                for s in range(num_stones)
-            )
+            # 大石头（静态 + 贴图），只在需要时加载
+            big_options = gymapi.AssetOptions()
+            big_options.fix_base_link = True
+            big_options.disable_gravity = True
+            big_options.density = float(self._stone_cfg_get("density", 1000.0))
+            self._apply_stone_collision_options(big_options, "big")
+            if num_big_stones > 0:
+                big_stone_asset = self.gym.load_asset(
+                    self.sim, stone_root, "stone_big.urdf", big_options)
+
+            small_body_count = (self.gym.get_asset_rigid_body_count(stone_asset)
+                                if stone_asset is not None else 0)
+            big_body_count = (self.gym.get_asset_rigid_body_count(big_stone_asset)
+                              if big_stone_asset is not None else 0)
+            self.num_stone_bodies = small_body_count or big_body_count
+            self.num_stone_bodies_total = (num_big_stones * big_body_count
+                                           + num_small_stones * small_body_count)
         else:
             self.num_stone_bodies = 0
             self.num_stone_bodies_total = 0
@@ -1225,79 +1369,94 @@ class LeggedRobot(BaseTask):
                 h_offset = getattr(self.cfg.stone, "spawn_height_offset", 0.3)
                 spawn_x_min, spawn_x_max = self.cfg.stone.stone_spawn_x
                 spawn_y_min, spawn_y_max = self.cfg.stone.stone_spawn_y
-                big_ids = getattr(self.cfg.stone, "big_stone_indices", [])
-                big_scale = getattr(self.cfg.stone, "big_stone_scale", 1.0)
-                big_positions = getattr(self.cfg.stone, "big_stone_positions", [])
+                big_scale = float(getattr(self.cfg.stone, "big_stone_scale", 1.0))
+                big_positions = list(getattr(self.cfg.stone, "big_stone_positions", []) or [])
+                small_static = bool(self._stone_cfg_get("small_static", True))
+                # 静态石头不会自由落体，直接贴地放置；动态时仍从 h_offset 抛下
+                small_z_offset = float(self._stone_cfg_get("small_static_z_offset", 0.01)
+                                       if small_static else h_offset)
 
-                for s in range(num_stones):
-                    stone_pose = gymapi.Transform()
-                    if s in big_ids:
-                        idx = big_ids.index(s)
-                        rx, ry = big_positions[idx]
-                        scale = big_scale
-                    else:
-                        rx = np.random.uniform(spawn_x_min, spawn_x_max)
-                        ry = np.random.uniform(spawn_y_min, spawn_y_max)
-                        scale = np.random.uniform(s_min, s_max)
-
+                # --- 1) 固定大石头（静态、带贴图）：actor 索引 1..num_big ---
+                #     保持“大石头在前、小碎石在后”的既有 actor 顺序，
+                #     root_states_reshaped 的切片与 pathplanner 的隐藏逻辑都依赖它。
+                for k in range(min(num_big_stones, len(big_positions))):
+                    rx, ry = big_positions[k]
                     terrain_z = self._get_terrain_height_at(rx, ry)
-
                     z_height = terrain_z + h_offset
-
+                    stone_pose = gymapi.Transform()
                     stone_pose.p = gymapi.Vec3(rx, ry, z_height)
-
-                    if s in big_ids:
-                        stone_pose.r = gymapi.Quat(0, 0, 0, 1)
-                        asset = big_stone_asset
-                    else:
-                        rand = np.random.randn(4)
-                        rand /= np.linalg.norm(rand)
-                        stone_pose.r = gymapi.Quat(rand[0], rand[1], rand[2], rand[3])
-                        asset = stone_asset
-                    # 创建石头
-                    asset = big_stone_asset if s in big_ids else stone_asset
-
+                    stone_pose.r = gymapi.Quat(0, 0, 0, 1)
                     stone_handle = self.gym.create_actor(
-                        env_handle, asset, stone_pose, f"stone_{s}", 0, 0, 0
-                    )
+                        env_handle, big_stone_asset, stone_pose, f"stone_{k}", 0, 0, 0)
+                    self.gym.set_actor_scale(env_handle, stone_handle, big_scale)
+                    self.stone_handles[i].append(stone_handle)
+                    env_stone_poses.append([rx, ry, z_height])
 
-                    # 缩放
+                # --- 2) 随机小碎石：actor 索引 num_big+1..num_stones ---
+                for s in range(num_small_stones):
+                    actor_id = num_big_stones + s
+                    rx = np.random.uniform(spawn_x_min, spawn_x_max)
+                    ry = np.random.uniform(spawn_y_min, spawn_y_max)
+                    scale = self._quantize_stone_scale(
+                        np.random.uniform(s_min, s_max), "small")
+                    terrain_z = self._get_terrain_height_at(rx, ry)
+                    z_height = terrain_z + small_z_offset
+                    stone_pose = gymapi.Transform()
+                    stone_pose.p = gymapi.Vec3(rx, ry, z_height)
+                    rand = np.random.randn(4)
+                    rand /= np.linalg.norm(rand)
+                    stone_pose.r = gymapi.Quat(rand[0], rand[1], rand[2], rand[3])
+                    stone_handle = self.gym.create_actor(
+                        env_handle, stone_asset, stone_pose, f"stone_{actor_id}", 0, 0, 0)
                     self.gym.set_actor_scale(env_handle, stone_handle, scale)
                     self.stone_handles[i].append(stone_handle)
                     env_stone_poses.append([rx, ry, z_height])
             self.saved_stone_start_poses.append(env_stone_poses)
             self.static_obstacle_handles[i] = self._create_static_obstacles(env_handle, i)
-            if i == 0:
+            cam_cfg = getattr(self.cfg, "camera", None)
+            if i == 0 and (cam_cfg is None or getattr(cam_cfg, "enable", True)):
                 camera_props = gymapi.CameraProperties()
-                camera_props.width = 1280
-                camera_props.height = 720
-                camera_props.horizontal_fov = 90.0
+                camera_props.width = int(getattr(cam_cfg, "width", 1280))
+                camera_props.height = int(getattr(cam_cfg, "height", 720))
+                camera_props.horizontal_fov = float(getattr(cam_cfg, "horizontal_fov", 90.0))
                 camera_props.enable_tensors = True
+                # 记下 fov，供感知模块校验（BEV 反投影必须用同一个 fov）
+                self.camera_horizontal_fov = camera_props.horizontal_fov
+                self.camera_resolution = (camera_props.width, camera_props.height)
 
                 cam_handle = self.gym.create_camera_sensor(env_handle, camera_props)
+                # headless（graphics_device_id == -1）下 IsaacGym 建不出相机，返回 -1。
+                # 若不拦下，后面 set_camera_location 会报
+                # "could not find camera with handle -1"，get_camera_image_gpu_tensor
+                # 还会打出 "*** Can't create empty tensor"。
+                # 这里按“无相机”处理：train --headless 日志干净，
+                # 而 pathplanner 读深度前已有 cam_handle is None 的守卫，不会崩。
+                if cam_handle is None or int(cam_handle) < 0:
+                    cam_handle = None
+                    self.camera_horizontal_fov = None
+                    self.camera_resolution = None
+                    if i == 0:
+                        print("[legged_robot] headless 下无法创建相机（cam_handle=-1），"
+                              "已跳过；需要深度图请勿加 --headless。")
 
-                # 使用你已有的 pos（env origin + 随机偏移）
-                cam_pos = gymapi.Vec3(
-                    pos[0].item() + 0.3,
-                    pos[1].item(),
-                    0.6
-                )
-                cam_target = gymapi.Vec3(
-                    pos[0].item() + 1.3,
-                    pos[1].item(),
-                    0.6
-                )
+                if cam_handle is not None:
+                    # 初始机位（运行时会被感知模块按 base 朝向重写）
+                    _fwd = float(getattr(cam_cfg, "forward_offset", 0.3))
+                    _look = float(getattr(cam_cfg, "lookat_forward_offset", 1.3))
+                    _init_h = float(getattr(cam_cfg, "init_height", 0.6))
+                    cam_pos = gymapi.Vec3(pos[0].item() + _fwd, pos[1].item(), _init_h)
+                    cam_target = gymapi.Vec3(pos[0].item() + _look, pos[1].item(), _init_h)
 
-                self.gym.set_camera_location(
-                    cam_handle,
-                    env_handle,
-                    cam_pos,
-                    cam_target
-                )
+                    self.gym.set_camera_location(
+                        cam_handle,
+                        env_handle,
+                        cam_pos,
+                        cam_target
+                    )
 
-                # 只保存一个
-                self.cam_handle = cam_handle
-                self.cam_env_handle = env_handle
+                    # 只保存一个
+                    self.cam_handle = cam_handle
+                    self.cam_env_handle = env_handle
 
         # ================= Get depth tensor =================
         if self.cam_handle is not None:
@@ -1367,7 +1526,11 @@ class LeggedRobot(BaseTask):
             self.cfg.terrain.curriculum = False
         self.max_episode_length_s = self.cfg.env.episode_length_s
         self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
-        self.stuck_steps_threshold = int(self.cfg.env.stuck_time_s / self.dt)
+        _term_cfg = getattr(self.cfg, "termination", None)
+        _stuck_time_s = float(getattr(_term_cfg, "stuck_time_s",
+                                      getattr(self.cfg.env, "stuck_time_s", 1.0))) \
+            if _term_cfg is not None else float(getattr(self.cfg.env, "stuck_time_s", 1.0))
+        self.stuck_steps_threshold = max(1, int(_stuck_time_s / self.dt))
 
         self.cfg.domain_rand.push_interval = np.ceil(self.cfg.domain_rand.push_interval_s / self.dt)
 

@@ -67,6 +67,43 @@ class LeggedRobotCfg(BaseConfig):
         # trimesh only:
         slope_treshold = 0.75 # slopes above this threshold will be corrected to vertical surfaces
 
+        # ---- 地形形状参数（原写死在 utils/terrain.py:make_terrain_by_id 里）----
+        #: sequence_terrain 使用的固定难度（影响坡度/台阶高度/障碍高度）
+        sequence_difficulty = 0.5
+        #: difficulty -> 各尺寸的换算系数
+        slope_scale = 0.4              # 坡度 = difficulty * slope_scale
+        amplitude_min = 0.01           # 粗糙起伏 = amplitude_min + amplitude_scale*difficulty
+        amplitude_scale = 0.07
+        step_height_scale = 0.18       # 台阶高度 = step_height_scale * difficulty
+        step_width = 0.50              # 台阶宽度 [m]
+        discrete_obstacle_base = 0.05  # 离散障碍高度 = base + discrete_obstacle_scale*difficulty
+        discrete_obstacle_scale = 0.1
+        #: 各地形的平台尺寸 [m]
+        platform_size_default = 3.0
+        platform_size_rough_slope = 0.5
+        #: 粗糙斜坡(id=1)的随机起伏
+        rough_slope_min_height = -0.05
+        rough_slope_max_height = 0.05
+        rough_slope_step = 0.005
+        rough_slope_downsample = 0.2
+        #: 离散障碍(id=4)
+        discrete_obstacle_height_fixed = 0.01
+        discrete_rect_min_size = 2
+        discrete_rect_max_size = 3
+        discrete_num_rectangles = 50
+        #: 离散高度(id=6)
+        height_field_min = 0.0
+        height_field_max = 0.08
+        height_field_step = 0.005
+        height_field_downsample = 0.2
+        #: 地形边界墙（utils/terrain.py:add_all_walls）
+        wall_enable = True
+        wall_thickness_m = 1.0
+        wall_height_m = 4.0
+        wall_margin_m = 1.0        # 与出生点的安全距离
+        #: sequence_terrain 列数不足时的兜底地形 id（5 = 平地）
+        sequence_fallback_terrain_id = 5
+
     class commands:
         curriculum = True
         max_curriculum = 3.0
@@ -205,6 +242,95 @@ class LeggedRobotCfg(BaseConfig):
         dynamic_friction = 1.0
         restitution = 0.
         assets = []
+        #: 同一个 URDF 被多个 spec 引用时复用已加载的 asset（避免重复 PhysX cooking）
+        reuse_duplicate_assets = True
+        #: 树的 collision mesh 面数极高时可开 vhacd 凸分解；实测默认参数更慢，慎用
+        vhacd_enabled = None
+        convex_decomposition_from_submeshes = None
+        vhacd_params = None
+
+    class camera:
+        """env0 上的深度/RGB 相机传感器。高层 BEV 建图依赖它，
+        ⚠ horizontal_fov 必须与感知模块用的视场角一致，否则深度图反投影会错位。
+        """
+        enable = True
+        width = 1280
+        height = 720
+        horizontal_fov = 90.0
+        #: 初始机位（仅第一帧生效，之后由感知模块按 base 朝向每步重写）
+        forward_offset = 0.3
+        lookat_forward_offset = 1.3
+        init_height = 0.6
+        #: 运行时相机相对 base 的安装高度（感知模块跟随用，见 viz_config.BEV_CAM_HEIGHT）
+        height_offset = 0.25
+
+    class spawn:
+        """机器人出生点与初速度。
+
+        ⚠ use_env_origins=False 时，所有 env 的机器人都被放到同一个固定世界坐标，
+          这是导航评测可复现的前提（起点一致），但训练时会让所有机器人挤在同一点。
+        """
+        #: False = 用下面的固定坐标；True = 用课程/地形算出的 env_origins
+        use_env_origins = False
+        fixed_position = (6.0, 9.0, 0.4)
+        #: use_env_origins=True 时，xy 方向的随机抖动幅度 [m]
+        origin_xy_jitter = 1.0
+        #: 重置时给机器人的随机初速度范围（线性速度 + 角速度，共 6 维）
+        #: 实现为 rand()-0.5 再乘该幅度，0 = 不给初速度
+        init_velocity_range = 1.0
+
+    class termination:
+        """终止判定阈值。基类给出与原 main 分支一致的行为，具体数值由
+        各机器人的 config（如 go2 -> viz_config）覆盖。
+        """
+        #: 碰撞终止：终止部位接触力超过该值即判摔倒
+        enable_collision = True
+        collision_force_threshold = 1.0
+        #: 超时终止
+        enable_timeout = True
+        #: 悬崖/掉落终止：base 高度低于该值
+        enable_cliff_fall = True
+        cliff_fall_height = -0.5
+        #: 卡住终止：命令速度够大但实际速度几乎为 0，持续 stuck_time_s 秒
+        enable_stuck = True
+        stuck_cmd_speed_min = 0.3
+        stuck_actual_speed_max = 0.05
+        stuck_time_s = 1.0
+
+    class stone:
+        """碎石/大石头场景。基类默认全关，go2 在自身 config 中覆盖。
+
+        大小石头数量是**两个独立开关**：
+          num_big_stones   固定位置的大石头（静态、带贴图）
+          num_small_stones 随机撒布的小碎石
+        num_stones 是二者之和，仅供底层创建循环使用，不要单独改。
+        """
+        enable = False
+        num_big_stones = 0
+        num_small_stones = 0
+        num_stones = 0
+        stone_spawn_x = (0.0, 1.0)
+        stone_spawn_y = (0.0, 1.0)
+        scale_min = 0.1
+        scale_max = 0.3
+        spawn_height_offset = 0.3
+        big_stone_positions = []
+        big_stone_indices = []
+        big_stone_scale = 1.0
+        density = 1000.0
+        small_urdf = "resources/stone/stone.urdf"
+        big_urdf = "resources/stone/stone_big.urdf"
+        #: 小碎石是否静态化（fix_base_link + disable_gravity）
+        small_static = True
+        #: 静态化时石头中心离地形的高度（动态时改用 spawn_height_offset 抛下落体）
+        small_static_z_offset = 0.01
+        #: 碰撞体模式: "mesh" | "vhacd" | None(用 IsaacGym 默认)
+        small_collision = "mesh"
+        big_collision = "mesh"
+        small_vhacd_params = {}
+        big_vhacd_params = {}
+        #: 把连续随机缩放量化成 N 档，复用 PhysX 碰撞几何缓存；0 = 不量化
+        small_scale_steps = 0
 
     class normalization:
         class obs_scales:

@@ -3,6 +3,13 @@ import matplotlib.pyplot as plt
 import glob
 import os
 
+# 路径与评测参数统一由 envs/go2/viz_config.py 管理，本脚本不再写死任何绝对路径
+from legged_gym.envs.go2.viz_config import (
+    TRAJ_FIG_DIR, TRAJ_FIG_ALGORITHM, TRAJ_FIG_TERRAIN,
+    COMPARE_ALGORITHMS, COMPARE_TERRAINS,
+    WAYPOINTS, compare_traj_dir, ensure_dir,
+)
+
 # ===================== 仅调大字体，不加粗 =====================
 plt.rcParams['font.family'] = 'DejaVu Sans'
 plt.rcParams['axes.unicode_minus'] = False
@@ -19,7 +26,7 @@ plt.rcParams['savefig.dpi'] = 300
 plt.rcParams['figure.dpi'] = 120
 # ======================================================================
 
-def plot_all_saved_trajectories(folder_path, goal_xy_all, save_path=None):
+def plot_all_saved_trajectories(folder_path, goal_xy_all, save_path=None, title=None):
     # 读取所有保存的轨迹
     traj_files = sorted(glob.glob(os.path.join(folder_path, "traj_*.npy")))
     all_trajs = [np.load(f) for f in traj_files]
@@ -74,7 +81,8 @@ def plot_all_saved_trajectories(folder_path, goal_xy_all, save_path=None):
     plt.grid(True)
     plt.xlabel("x [m]")
     plt.ylabel("y [m]")
-    plt.title("FMM_Slope")
+    if title:
+        plt.title(title)
 
     # 图例去重
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -88,18 +96,23 @@ def plot_all_saved_trajectories(folder_path, goal_xy_all, save_path=None):
     plt.close()
 
 # -----------------------------------------------------------------------------
+#  出图对象来自 viz_config.TRAJ_FIG_ALGORITHM / TRAJ_FIG_TERRAIN，改那里即可切换
+ALGORITHM = TRAJ_FIG_ALGORITHM      # "dwa"(A*+DWA) / "fmm"(本文) / "rrt"(RRT*)
+TERRAIN = TRAJ_FIG_TERRAIN          # "height" / "obstacles" / "slope"
+
 if __name__ == "__main__":
-    TRAJECTORY_FOLDER = "/home/hzz/project/HIMLoco/legged_gym/legged_gym/scripts/FMM_Slope"
-    
-    WAYPOINTS = [
-        (11.0, 8.0),
-        (15.0, 4.0),
-        (19.0, 7.0),
-        (23.0, 5.0),
-    ]
-    
+    assert ALGORITHM in COMPARE_ALGORITHMS, f"未知算法: {ALGORITHM}"
+    assert TERRAIN in COMPARE_TERRAINS, f"未知地形: {TERRAIN}"
+
+    # 轨迹数据目录：assets/data/compare/<algo>_<terrain>/traj_*.npy
+    TRAJECTORY_FOLDER = compare_traj_dir(ALGORITHM, TERRAIN)
+    # 汇总图输出：assets/figs/summary/
+    SAVE_PATH = os.path.join(ensure_dir(TRAJ_FIG_DIR),
+                             f"{ALGORITHM}_{TERRAIN}_trajectories.png")
+
     plot_all_saved_trajectories(
         folder_path=TRAJECTORY_FOLDER,
         goal_xy_all=WAYPOINTS,
-        save_path="guijitu"
+        save_path=SAVE_PATH,
+        title=f"{ALGORITHM.upper()}_{TERRAIN.capitalize()}",
     )

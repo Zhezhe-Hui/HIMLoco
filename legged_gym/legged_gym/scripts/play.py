@@ -38,11 +38,30 @@ from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Log
 import numpy as np
 import torch
 
-LEG_CLOSEUP_CAPTURE = True
-LEG_CLOSEUP_DIR = "/home/hzz/project/HIMLoco/legged_gym/legged_gym/envs/照片/tuibutexie"
-LEG_CLOSEUP_START_STEP = 20
-LEG_CLOSEUP_FRAME_INTERVAL = 3
-LEG_CLOSEUP_MAX_FRAMES = 150
+# =====================================================================
+#  截图/出图开关已统一到 viz_config.py
+#  改开关请编辑: legged_gym/legged_gym/envs/go2/viz_config.py
+#  （ACTIVE_PRESET = "off" 可一键关掉所有截图）
+# =====================================================================
+from legged_gym.envs.go2.viz_config import (
+    LEG_CLOSEUP_CAPTURE, LEG_CLOSEUP_DIR, LEG_CLOSEUP_START_STEP,
+    LEG_CLOSEUP_FRAME_INTERVAL, LEG_CLOSEUP_MAX_FRAMES,
+    EXPORT_POLICY, RECORD_FRAMES, MOVE_CAMERA, NUM_ENVS,
+    PLAY_VEL_X, PLAY_VEL_Y, PLAY_VEL_YAW,
+    LEG_CAMERA_FORWARD_M, LEG_CAMERA_LEFT_M, LEG_CAMERA_HEIGHT_M,
+    LEG_CAMERA_LOOKAT_FORWARD_M, LEG_CAMERA_LOOKAT_HEIGHT_M,
+)
+from legged_gym.envs.go2.viz_config import ensure_dirs as _ensure_viz_dirs, summary as _viz_summary
+from legged_gym.envs.go2.viz_config import (
+    EVAL_OVERRIDES, POLICY_LOAD_RUN, POLICY_CHECKPOINT,
+)
+from legged_gym.envs.go2.viz_config import (
+    PLAY_LOG_ROBOT_INDEX, PLAY_LOG_JOINT_INDEX, PLAY_LOG_STATE_STEPS,
+    PLAY_TOTAL_STEPS_MULTIPLIER, PLAY_PLOT_STATES,
+)
+
+_ensure_viz_dirs()
+print("[viz_config] " + _viz_summary())
 
 
 def _get_robot_yaw(env, robot_index=0):
@@ -59,8 +78,12 @@ def _set_leg_closeup_camera(env, robot_index=0):
     left = np.array([-np.sin(yaw), np.cos(yaw), 0.0])
 
     # Front-right overhead view: full robot in frame, legs visible, obstacle ahead visible.
-    camera_position = base_pos + 1.4* forward + 0.5 * left + np.array([0.0, 0.0, 0.45])
-    camera_target = base_pos + 0.10 * forward + np.array([0.0, 0.0, 0.15])
+    # 机位参数见 viz_config.py 第十五节
+    camera_position = (base_pos + LEG_CAMERA_FORWARD_M * forward
+                       + LEG_CAMERA_LEFT_M * left
+                       + np.array([0.0, 0.0, LEG_CAMERA_HEIGHT_M]))
+    camera_target = (base_pos + LEG_CAMERA_LOOKAT_FORWARD_M * forward
+                     + np.array([0.0, 0.0, LEG_CAMERA_LOOKAT_HEIGHT_M]))
     env.set_camera(camera_position, camera_target)
 
 
@@ -75,16 +98,13 @@ def _save_leg_closeup_frame(env, frame_id):
     return True
 
 
-def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
+def play(args, x_vel=PLAY_VEL_X, y_vel=PLAY_VEL_Y, yaw_vel=PLAY_VEL_YAW):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
-    env_cfg.env.num_envs = min(env_cfg.env.num_envs, 50)
-    env_cfg.noise.add_noise = False
-    env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.push_robots = False
-    env_cfg.domain_rand.disturbance = False
-    env_cfg.domain_rand.randomize_payload_mass = False
-    env_cfg.commands.heading_command = False
+    env_cfg.env.num_envs = NUM_ENVS
+    # 噪声/域随机化覆盖项统一走 viz_config.EVAL_OVERRIDES（默认全关，与原行为一致）
+    for (section, key), value in EVAL_OVERRIDES:
+        setattr(getattr(env_cfg, section), key, value)
     
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
@@ -95,20 +115,23 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     obs = env.get_observations()
     # load policy
     train_cfg.runner.resume = True
+    # 显式指定 run / checkpoint，避免 get_load_path 按目录名字符串排序误选模型
+    train_cfg.runner.load_run = POLICY_LOAD_RUN
+    train_cfg.runner.checkpoint = POLICY_CHECKPOINT
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
     policy = ppo_runner.get_inference_policy(device=env.device)
 
     # export policy as a jit module (used to run it from C++)
-    EXPORT_POLICY = True
     if EXPORT_POLICY:
         path = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, 'exported', 'policies')
         export_policy_as_jit(ppo_runner.alg.actor_critic, path)
         print('Exported policy as jit script to: ', path)
 
     logger = Logger(env.dt)
-    robot_index = 0  # which robot is used for logging
-    joint_index = 1  # which joint is used for logging
-    stop_state_log = 100  # number of steps before plotting states
+    # 日志索引/步数统一在 viz_config.py 第十五节配置
+    robot_index = PLAY_LOG_ROBOT_INDEX   # which robot is used for logging
+    joint_index = PLAY_LOG_JOINT_INDEX   # which joint is used for logging
+    stop_state_log = PLAY_LOG_STATE_STEPS  # number of steps before plotting states
     stop_rew_log = env.max_episode_length + 1  # 基于episode_length_s计算的步数阈值
     camera_position = np.array(env_cfg.viewer.pos, dtype=np.float64)
     camera_vel = np.array([1., 1., 0.])
@@ -124,16 +147,13 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
         'step_count': 0
     }
     metrics_printed = False  # 标记是否已打印性能指标
-    
-    RECORD_FRAMES = False
-    MOVE_CAMERA = False
     leg_closeup_frame_id = 0
     if LEG_CLOSEUP_CAPTURE:
         os.makedirs(LEG_CLOSEUP_DIR, exist_ok=True)
         print(f"Leg close-up frames will be saved to: {LEG_CLOSEUP_DIR}")
 
     # 运行到episode结束（基于episode_length_s配置）
-    total_steps = int(env.max_episode_length * 1.1)  # 多运行10%确保完成
+    total_steps = int(env.max_episode_length * PLAY_TOTAL_STEPS_MULTIPLIER)
     
     for i in range(total_steps):
         actions = policy(obs.detach())
@@ -198,7 +218,8 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
                 }
             )
         elif i == stop_state_log:
-            logger.plot_states()
+            if PLAY_PLOT_STATES:
+                logger.plot_states()
         
         # 奖励日志打印逻辑（原逻辑）
         if 0 < i < stop_rew_log:
@@ -243,4 +264,4 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
 
 if __name__ == '__main__':
     args = get_args()
-    play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0)
+    play(args, x_vel=PLAY_VEL_X, y_vel=PLAY_VEL_Y, yaw_vel=PLAY_VEL_YAW)

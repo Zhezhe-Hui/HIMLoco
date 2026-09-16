@@ -2,6 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+# 输出目录与开关统一由 envs/go2/viz_config.py 管理，本脚本不再往 cwd 里写图
+from legged_gym.envs.go2.viz_config import (
+    METRICS_FIG_DIR, METRICS_PRINT_STATS, METRICS_SHOW_PLOT, ensure_dir,
+)
+
 # ===================== 全局字体&字号配置 =====================
 plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei']
 plt.rcParams['axes.unicode_minus'] = False
@@ -13,8 +18,10 @@ plt.rcParams['ytick.labelsize'] = 12     # Y 轴刻度数字大小
 plt.rcParams['legend.fontsize'] = 13     # 图例大小
 
 def generate_report():
-    # ===================== 【统计功能总开关，False即关闭统计】 =====================
-    enable_stat_analysis = True
+    # ===================== 【统计功能总开关】viz_config.METRICS_PRINT_STATS =====================
+    enable_stat_analysis = METRICS_PRINT_STATS
+    # 出图目录（assets/figs/metrics/）
+    out_dir = ensure_dir(METRICS_FIG_DIR)
 
     # ===================== 中文字体容错加载 =====================
     possible_path = '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'
@@ -149,7 +156,8 @@ def generate_report():
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.legend(loc='upper right')
         plt.tight_layout()
-        plt.savefig(f"smoothness_{env_name}.png", dpi=300)
+        plt.savefig(os.path.join(out_dir, f"smoothness_{env_name}.png"), dpi=300)
+        plt.close()
 
         # 图2：规划耗时对比
         plt.figure(figsize=(10, 8))
@@ -163,9 +171,12 @@ def generate_report():
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.legend(loc='upper right')
         plt.tight_layout()
-        plt.savefig(f"planning_time_{env_name}.png", dpi=300)
+        plt.savefig(os.path.join(out_dir, f"planning_time_{env_name}.png"), dpi=300)
+        plt.close()
 
-    plt.show()
+    print(f"📸 指标对比图已保存到: {out_dir}")
+    if METRICS_SHOW_PLOT:
+        plt.show()
 
 if __name__ == "__main__":
     generate_report()

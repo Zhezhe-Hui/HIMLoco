@@ -16,84 +16,32 @@ from legged_gym.envs.go2.bev_height_mapper import plot_all_trials,plot_all_saved
 from legged_gym.envs.go2.rrt_planner import RRTController
 from legged_gym.envs.go2.a_star_dwa_planner import AStarDWAController
 
-# ============================= 保存开关 =============================
-# 保存 RGB / Depth 相机图像。只保存文件，不弹实时窗口。
-SAVE_CAMERA_IMAGES = False
-SAVE_CAMERA_IMAGE_INTERVAL = 50
-SAVE_CAMERA_IMAGE_DIR = "/home/hzz/project/HIMLoco/legged_gym/legged_gym/envs/照片/rgb_sav"
-SAVE_RGB_IMAGE = False
-SAVE_DEPTH_IMAGE = False
+# =====================================================================
+#  所有可视化 / 截图 / 出图开关已统一迁移到 viz_config.py
+#  改开关请编辑: legged_gym/legged_gym/envs/go2/viz_config.py
+#  （改 ACTIVE_PRESET 一行即可切换 off / viewer_only / paper / all）
+# =====================================================================
+from legged_gym.envs.go2.viz_config import *  # noqa: F401,F403
+from legged_gym.envs.go2.viz_config import ensure_dirs as _ensure_viz_dirs, summary as _viz_summary
 
-# 保存 BEV 高度图、障碍图、FMM 势场和局部规划路线三联图。
-SAVE_BEV_FMM_IMAGES = False
-SAVE_BEV_FMM_INTERVAL = 5
-SAVE_BEV_FMM_MAX_PER_TRIAL = 800
-SAVE_BEV_FMM_DIR = "/home/hzz/project/HIMLoco/legged_gym/legged_gym/envs/照片/bev_fmm"
+_ensure_viz_dirs()
+print("[viz_config] " + _viz_summary())
 
-# 保存每个 trial 跑完后的 IsaacGym 固定相机截图，并在截图上叠加规划路线和实际轨迹。
-SAVE_TRIAL_ROUTE_IMAGE = False
-SAVE_TRIAL_ROUTE_DIR = "/home/hzz/project/HIMLoco/legged_gym/legged_gym/envs/照片/trial_route"
-# 是否在总览图里叠加运行过程中采样到的局部 FMM 预测段。
-SAVE_TRIAL_ROUTE_LOCAL_FMM_SEGMENTS = False
-SAVE_TRIAL_ROUTE_LOCAL_FMM_INTERVAL = 10
+class MemoryGuardExceeded(RuntimeError):
+    """进程 RSS 超过 SAFETY_MEM_LIMIT_GB，主动中止评测以免拖死整机。"""
 
-# 保存每次 trial 的真实行走轨迹 .npy。
-SAVE_TRAJECTORY_NPY = False
-SAVE_TRAJECTORY_DIR = "saved_trajectories"
-# 保存所有 trial 汇总轨迹图。
-SAVE_SUMMARY_TRAJECTORY_PLOT = False
-SAVE_SUMMARY_TRAJECTORY_PLOT_DIR = "/home/hzz/project/HIMLoco/legged_gym/legged_gym/envs/go2"
 
-# IsaacGym viewer 跟随相机参数。只移动视角，不保存图片/视频。
-TRIAL_FOLLOW_CAMERA_BACK_M = 2.5
-TRIAL_FOLLOW_CAMERA_RIGHT_M = 0.9
-TRIAL_FOLLOW_CAMERA_HEIGHT_M = 0.6
-TRIAL_FOLLOW_CAMERA_LOOKAHEAD_M = 1.0
-TRIAL_FOLLOW_CAMERA_LOOKAT_HEIGHT_M = 0.35
-# ===================================================================
+def _read_self_rss_gb():
+    """读本进程 VmRSS（GB）。非 Linux 或读不到时返回 None（不触发看门狗）。"""
+    try:
+        with open("/proc/self/status", "r") as fh:
+            for line in fh:
+                if line.startswith("VmRSS:"):
+                    return float(line.split()[1]) / (1024.0 * 1024.0)
+    except Exception:
+        return None
+    return None
 
-# =========================== 实时可视化开关 ==========================
-# 实时显示 RGB / Depth 相机窗口。
-LIVE_SHOW_CAMERA_IMAGES = False
-# 实时弹出 BEV/FMM 三联图 matplotlib 窗口。
-LIVE_SHOW_BEV_FMM_WINDOW = False
-LIVE_BEV_FMM_WINDOW_INTERVAL = 5
-# 实时显示 RGB / Depth 相机窗口的刷新间隔。
-LIVE_CAMERA_IMAGE_INTERVAL = 5
-# 在 IsaacGym viewer 里实时画目标点、已走轨迹、预测路径。
-LIVE_DRAW_VIEWER_OVERLAY = True
-LIVE_DRAW_WAYPOINTS = True
-LIVE_DRAW_TRAJECTORY = False
-LIVE_DRAW_FMM_PATH = True
-# 只移动 IsaacGym viewer 相机跟随机器狗，不保存图片/视频。适合直接用电脑录屏。
-LIVE_FOLLOW_VIEWER_CAMERA = True
-# 完成整条路线后是否停留几秒看最终路线。
-LIVE_HOLD_FINAL_ROUTE = False
-# ===================================================================
-
-# ============================ 画图样式开关 ===========================
-# 仅用于画图的路径平滑，不影响实际控制。
-BEV_FMM_SMOOTH_PATH = False
-# BEV/FMM 三联图是否显示第三张 FMM 到达时间势场图。
-BEV_FMM_SHOW_POTENTIAL = False
-# Trial 总览图中是否显示“起点 -> 目标点 -> 终点”的连接线。False 时只显示 FMM 规划线和实际轨迹。
-TRIAL_ROUTE_SHOW_TARGET_ORDER_LINE = False
-# Trial 总览图中，目标点连接线是否做平滑显示，只影响图片，不影响控制。
-TRIAL_ROUTE_SMOOTH_TARGET_LINE = False
-# 固定相机俯视拍摄参数；高度会根据路线范围自动增大。
-TRIAL_ROUTE_CAMERA_MIN_HEIGHT = 8.0
-TRIAL_ROUTE_CAMERA_FOV_DEG = 90.0
-# 固定截图横轴范围，只拍世界坐标 x=0~25m 这一段。
-TRIAL_ROUTE_CAMERA_X_RANGE = (3.0, 27.0)
-# None 表示按地形宽度自动取 y 范围；也可以手动写成 (0.0, 12.0)。
-TRIAL_ROUTE_CAMERA_Y_RANGE = None
-# 相机轻微倾斜俯视，避免严格正俯视导致 IsaacGym RGB color tensor 变黑。
-TRIAL_ROUTE_CAMERA_BACK_Y_M = -10
-TRIAL_ROUTE_CAMERA_LOOKAT_Z = 0.35
-# 拍最终 RGB 路线图时临时隐藏小石头，只保留大石头和树。
-TRIAL_ROUTE_HIDE_SMALL_STONES_IN_CAMERA = False
-TRIAL_ROUTE_OVERLAY_Z_OFFSET = 0.08
-# ===================================================================
 
 class SimplePlanner:
     def __init__(self,
@@ -117,6 +65,11 @@ class Evaluator:
         self.planner = planner
         self.max_steps = max_steps
         self.render = render
+        # viewer 逐帧重绘开关：关掉后 env.step() 内部的 render() 只轮询窗口事件，
+        # 不再执行 step_graphics + draw_viewer（这是整机卡死的主因）。
+        # 只在确实存在 viewer 时才改，避免 headless 下无谓写属性。
+        if getattr(self.env, "viewer", None) is not None:
+            self.env.enable_viewer_sync = bool(LIVE_VIEWER_SYNC)
         self._last_drawn_id = -1
         self.traj_xy_all = []     # 所有 trial 的轨迹
         self.goal_xy_all = []     # 所有 goal
@@ -132,43 +85,54 @@ class Evaluator:
             "total_trials": 0
         }
         # =====================================
+        # 所有参数来自 viz_config.py 第十四节，勿在此写死数值
         self.bev = BEVMapper(
-            cam_height=0.25,              # 相机高度（你这个值是对的）
-            height_range_thresh=0.2,     # 核心阈值（不是 obstacle_height）
-            bev_x=6.0,
-            bev_y=6.0,
-            bev_res=0.05,
-            min_points=8,                # 每个 cell 至少多少像素才可信
+            cam_height=BEV_CAM_HEIGHT,
+            height_range_thresh=BEV_HEIGHT_RANGE_THRESH,
+            bev_x=BEV_X,
+            bev_y=BEV_Y,
+            bev_res=BEV_RES,
+            min_points=BEV_MIN_POINTS,
+            hfov_deg=BEV_HFOV_DEG,
+            max_depth=BEV_MAX_DEPTH,
+            v_start_ratio=BEV_V_START_RATIO,
+            min_depth=BEV_MIN_DEPTH,
+            enable_memory_fusion=BEV_ENABLE_MEMORY_FUSION,
+            memory_max_age=BEV_MEMORY_MAX_AGE,
         )
         self.last_occ = None
         self.mode = mode
         if self.mode == 'fmm':
             self.fmm = FMMGradientController(
-                bev_res=0.05, bev_x=6.0, bev_y=6.0,
-                max_wz=1.0,
-                yaw_k=2.0,
-                lookahead_m=0.6,
-                inflate_radius_m=0.25,
+                bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
+                max_wz=FMM_MAX_WZ,
+                yaw_k=FMM_YAW_K,
+                lookahead_m=FMM_LOOKAHEAD_M,
+                inflate_radius_m=FMM_INFLATE_RADIUS_M,
+                goal_min_forward_m=FMM_GOAL_MIN_FORWARD_M,
             )
         elif self.mode == 'rrt':
-            self.fmm = RRTController(     
-            bev_res=0.05, bev_x=6.0, bev_y=6.0,
-            max_wz=1.0,
-            yaw_k=2.0,
-            lookahead_m=0.6,
-            inflate_radius_m=0.25,
-        )
+            self.fmm = RRTController(
+                bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
+                max_wz=RRT_MAX_WZ,
+                yaw_k=RRT_YAW_K,
+                lookahead_m=RRT_LOOKAHEAD_M,
+                inflate_radius_m=RRT_INFLATE_RADIUS_M,
+                goal_min_forward_m=FMM_GOAL_MIN_FORWARD_M,
+            )
         elif self.mode == 'astar_dwa': # 新增
             self.fmm = AStarDWAController(
-            bev_res=0.05, bev_x=6.0, bev_y=6.0,
-            max_vx=1.0, max_wz=1.2, 
-            inflate_radius_m=0.25
+                bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
+                max_vx=DWA_MAX_VX, max_wz=DWA_MAX_WZ,
+                max_acc_vx=DWA_MAX_ACC_VX, max_acc_wz=DWA_MAX_ACC_WZ,
+                dt=DWA_DT, predict_time=DWA_PREDICT_TIME,
+                inflate_radius_m=DWA_INFLATE_RADIUS_M,
             )
         # ==================== 加这三行 ====================
         self.save_trajectory_dir = SAVE_TRAJECTORY_DIR
         os.makedirs(self.save_trajectory_dir, exist_ok=True)
         self.trial_index = 0
-        self.final_hold_seconds = 5.0
+        self.final_hold_seconds = NAV_FINAL_HOLD_SECONDS
         self._bev_vis_fig = None
         self._bev_vis_saved_count = 0
         self._camera_vis_fig = None
@@ -206,6 +170,19 @@ class Evaluator:
         self.trial_step_smoothness = []  # 记录每一步规划的平滑度
         # ----------------
         for step in range(self.max_steps):
+            # --- 内置内存看门狗：viewer 逐帧重绘在远程桌面下会持续泄漏内存，
+            #     吃满物理内存后触发 swap 会把整台机器（含远程桌面）拖死。
+            #     这里超阈值就主动抛错退出，见 viz_config.SAFETY_MEM_*。
+            if (SAFETY_MEM_GUARD_ENABLE
+                    and step % max(1, int(SAFETY_MEM_CHECK_INTERVAL)) == 0):
+                rss_gb = _read_self_rss_gb()
+                if rss_gb is not None and rss_gb > SAFETY_MEM_LIMIT_GB:
+                    raise MemoryGuardExceeded(
+                        "内存看门狗触发：RSS=%.1fGB 超过上限 %.1fGB（trial %d, step %d）。"
+                        "已主动中止以免整机卡死。原因通常是 viewer 逐帧重绘泄漏："
+                        "请改用 ACTIVE_PRESET=\"nav_only\"，或把 LIVE_VIEWER_SYNC 设为 False、"
+                        "LIVE_DRAW_INTERVAL 调大。"
+                        % (rss_gb, SAFETY_MEM_LIMIT_GB, trial_id, step))
             # --- Show depth camera ---
             actions = self.policy(obs)
             t = step * self.env.dt
@@ -283,13 +260,14 @@ class Evaluator:
             # )
             # --- 增加以下记录逻辑 ---
             current_smooth = self._calculate_smoothness(raw_path)
-            # 只有当路径有效（不是默认值 1.5 或 0）时才加入统计
-            if 0 < current_smooth < 1.0:
+            # 只有当路径有效（不是兜底值或 0）时才加入统计
+            if METRIC_SMOOTH_VALID_MIN < current_smooth < METRIC_SMOOTH_VALID_MAX:
                 self.trial_step_smoothness.append(current_smooth)
             # ===== waypoint 切换 =====
-            if self.fmm.is_goal_reached(thresh_m=0.3):  # 0.3m 到达
+            if self.fmm.is_goal_reached(thresh_m=NAV_GOAL_REACH_THRESH_M):
                 if raw_path is not None and len(raw_path) > 1:
-                    pts = np.array(raw_path) * 0.05
+                    # 原来写死 * 0.05，改 bev_res 后路径长度会算错，这里跟着 BEV_RES 走
+                    pts = np.array(raw_path) * BEV_RES
                     self.trial_total_length += np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1))
                 # ===== 记录当前 goal（世界坐标）=====
                 self.goal_xy_all.append(
@@ -308,7 +286,7 @@ class Evaluator:
                 if self.trial_step_smoothness:
                     avg_smooth = np.mean(self.trial_step_smoothness)
                 else:
-                    avg_smooth = 1.5 # 失败且无有效路径时
+                    avg_smooth = METRIC_SMOOTH_FALLBACK  # 失败且无有效路径时
                 
                 self.stats["smoothness"].append(avg_smooth)
                 self.stats["time_ms"].append(np.mean(self.trial_step_times) if self.trial_step_times else 0)
@@ -335,9 +313,9 @@ class Evaluator:
                     self._save_trial_route_plot(trial_id, status)
                     return self._handle_fail(reason, elapsed_time)
 
-            # 下发动作
+            # 下发动作：vx 固定前进，wz 由高层规划器给出（速度见 viz_config.NAV_FORWARD_VX）
             self.env.commands[:] = 0.0
-            self.env.commands[0, 0] = 1
+            self.env.commands[0, 0] = NAV_FORWARD_VX
             self.env.commands[0, 2] = wz
             self._update_live_follow_camera()
             obs, _, _, dones, infos, _, _ = self.env.step(actions)
@@ -351,7 +329,10 @@ class Evaluator:
                 "torque_cost": torque_cost
             })
             # --- IsaacGym viewer 实时叠加可视化 ---
-            if LIVE_DRAW_VIEWER_OVERLAY and self.render and self.env.viewer is not None:
+            # 节流：LIVE_DRAW_INTERVAL>1 时按间隔重画，省掉大量 add_lines/clear_lines
+            if (LIVE_DRAW_VIEWER_OVERLAY and self.render
+                    and self.env.viewer is not None
+                    and step % max(1, int(LIVE_DRAW_INTERVAL)) == 0):
                 self._draw_current_visualization()
 
                 # 每当 current_id 变化时才记录，提高性能
@@ -1182,22 +1163,29 @@ class Evaluator:
                     
     def _update_camera_and_bev(self, step):
 
+        # 无相机（headless 跑 train、或 cam 创建失败）时直接跳过，
+        # 否则下面 set_camera_location(None, ...) 会报错。
+        # 与 _capture_fixed_overhead_image 的守卫保持一致。
+        if self.env.cam_handle is None or self.env.camera_depth_tensor is None:
+            return
+
         # === 相机跟随 ===
         base_pos = self.env.root_states[0, 0:3].cpu().numpy()
         base_yaw = self._get_base_yaw(0)
 
         fx = np.cos(base_yaw)
         fy = np.sin(base_yaw)
+        # 机位参数见 viz_config.py 第十四节；CAM_FOLLOW_HEIGHT 需与 BEV_CAM_HEIGHT 一致
         cam_pos = gymapi.Vec3(
-            base_pos[0] + 0.3 * fx,
-            base_pos[1] + 0.3 * fy,
-            base_pos[2] + 0.25
+            base_pos[0] + CAM_FOLLOW_FORWARD * fx,
+            base_pos[1] + CAM_FOLLOW_FORWARD * fy,
+            base_pos[2] + CAM_FOLLOW_HEIGHT
         )
 
         cam_target = gymapi.Vec3(
-            base_pos[0] + 1.0 * fx,
-            base_pos[1] + 1.0 * fy,
-            base_pos[2] +0.25
+            base_pos[0] + CAM_FOLLOW_LOOKAT_FORWARD * fx,
+            base_pos[1] + CAM_FOLLOW_LOOKAT_FORWARD * fy,
+            base_pos[2] + CAM_FOLLOW_HEIGHT
         )
 
         self.env.gym.set_camera_location(
@@ -1208,6 +1196,21 @@ class Evaluator:
         )
 
         # === 读深度 ===
+        # CAM_READ_ENABLE=False 时跳过整段 GPU→CPU 拷贝（每步两张图）。
+        # 只有 BEV_ENABLE_UPDATE / 存图 / 实时窗口 才真正需要深度数据，
+        # 见 viz_config.CAM_READ_ENABLE 的说明；check_consistency 会提示误配。
+        if not CAM_READ_ENABLE:
+            return
+        # ⚠ 关键：IsaacGym 要求先 step_graphics 同步相机位姿，再 render_all_camera_sensors，
+        #   否则拿到的是上一帧的陈旧深度图。原本这一步是靠 env.step() 里的
+        #   env.render() 顺带做的，而 render() 只在 enable_viewer_sync=True 时才调
+        #   step_graphics —— 所以一旦用 LIVE_VIEWER_SYNC=False 关掉逐帧重绘，
+        #   深度相机就会静默失效、导航跟着退化。这里显式补上，把两者解耦。
+        #   viewer 已在逐帧重绘时不重复调用，避免白白多花一次 step_graphics。
+        if (getattr(self.env, "viewer", None) is None
+                or not getattr(self.env, "enable_viewer_sync", True)):
+            if hasattr(self.env.gym, "step_graphics"):
+                self.env.gym.step_graphics(self.env.sim)
         self.env.gym.render_all_camera_sensors(self.env.sim)
         self.env.gym.start_access_image_tensors(self.env.sim)
         depth = self.env.camera_depth_tensor.detach().cpu().numpy()
@@ -1215,12 +1218,17 @@ class Evaluator:
         self.env.gym.end_access_image_tensors(self.env.sim)
 
         depth = np.nan_to_num(depth, 0.0)
-        depth_pos = np.clip(-depth, 0.0, 6.0)
+        # 裁剪上限与 BEV_MAX_DEPTH 一致（BEV 建图也按同一上限过滤无效深度）
+        depth_pos = np.clip(-depth, 0.0, BEV_MAX_DEPTH)
         rgb = rgb[..., :3]
         rgb = rgb.astype(np.uint8)
 
         # === BEV Height Map ===
-        # self.bev.update(depth_pos)
+        # 开关见 viz_config.BEV_ENABLE_UPDATE。
+        # ⚠ 原代码这一行被注释掉，导致 BEV 障碍图恒为空（上层看不到障碍）。
+        #   默认仍保持原行为；改成 True 才会真正把深度图喂进 BEV 建图。
+        if BEV_ENABLE_UPDATE:
+            self.bev.update(depth_pos)
         self._handle_camera_images(step, rgb, depth_pos)
 
     def run(self, num_trials):
@@ -1234,6 +1242,11 @@ class Evaluator:
                 ok, t = self.run_single_trial(trial_id)
             except KeyboardInterrupt:
                 print("\nKeyboardInterrupt: evaluation interrupted.")
+                break
+            except MemoryGuardExceeded as mem_err:
+                # 主动中止而非拖死整机；已完成的 trial 指标照常汇总输出
+                print("\n⛔ " + str(mem_err))
+                print("   已完成的 trial 结果仍会照常汇总（见下方 Evaluation Result）。")
                 break
         # 打印本轮结果
             if len(self.stats["smoothness"]) > 0:
@@ -1291,7 +1304,7 @@ class Evaluator:
         return torch.atan2(forward[1], forward[0]).item()
 
     def _draw_waypoints(self):
-        sphere_radius = 0.15
+        sphere_radius = DRAW_WAYPOINT_RADIUS_M
         for idx, wp in enumerate(self.planner.waypoints):
             if self.planner.visited[idx]:
                 color = (0, 1, 0)   
@@ -1307,7 +1320,8 @@ class Evaluator:
                 color=color 
             )
             pose = gymapi.Transform()
-            pose.p = self._get_draw_position(wp[0], wp[1], sphere_radius, clearance=0.08)
+            pose.p = self._get_draw_position(wp[0], wp[1], sphere_radius,
+                                             clearance=DRAW_WAYPOINT_CLEARANCE_M)
             gymutil.draw_lines(
                 sphere_geom,
                 self.env.gym,
@@ -1316,7 +1330,7 @@ class Evaluator:
                 pose
             )
 
-    def _get_draw_position(self, x, y, radius, clearance=0.05):
+    def _get_draw_position(self, x, y, radius, clearance=DRAW_DEFAULT_CLEARANCE_M):
         if hasattr(self.env, "_get_terrain_height_at"):
             terrain_z = self.env._get_terrain_height_at(float(x), float(y))
         else:
@@ -1328,8 +1342,16 @@ class Evaluator:
         if len(self.traj_xy_cur) < 1:
             return
 
-        sphere_radius = 0.05
-        step_skip = 8
+        sphere_radius = DRAW_TRAJ_RADIUS_M
+        step_skip = DRAW_TRAJ_STEP_SKIP
+        # 原实现每步重画【全部】历史轨迹点：轨迹越长每步越慢（O(N²)），
+        # 1500 步时每步要画 ~187 个球 × 72 条线 ≈ 1.3 万条线段，远程桌面下直接卡死。
+        # 这里按上限自动放大抽样间隔，把球数压到 LIVE_DRAW_TRAJ_MAX_POINTS 以内。
+        max_pts = int(LIVE_DRAW_TRAJ_MAX_POINTS)
+        if max_pts > 0:
+            n_pts = len(range(0, len(self.traj_xy_cur), step_skip))
+            if n_pts > max_pts:
+                step_skip = max(1, int(len(self.traj_xy_cur) / max_pts))
 
         sphere_geom = gymutil.WireframeSphereGeometry(
             radius=sphere_radius,
@@ -1343,7 +1365,8 @@ class Evaluator:
             p = self.traj_xy_cur[i]
 
             pose = gymapi.Transform()
-            pose.p = self._get_draw_position(p[0], p[1], sphere_radius, clearance=0.06)
+            pose.p = self._get_draw_position(p[0], p[1], sphere_radius,
+                                             clearance=DRAW_TRAJ_CLEARANCE_M)
 
             gymutil.draw_lines(
                 sphere_geom,
@@ -1357,9 +1380,15 @@ class Evaluator:
         if len(rc_path) < 2:
             return
 
-        # ===== 参数（你可以调）=====
-        sphere_radius = 0.04   # 控制“粗细”
-        step_skip = 10          # 每隔几个点画一个（降低开销）
+        # ===== 参数（在 viz_config.py 的 DRAW_FMM_PATH_* 里调）=====
+        sphere_radius = DRAW_FMM_PATH_RADIUS_M   # 控制“粗细”
+        step_skip = DRAW_FMM_PATH_STEP_SKIP      # 每隔几个点画一个（降低开销）
+        # 同 _draw_traj：按上限压住球数，避免路径长时绘制开销线性膨胀
+        max_pts = int(LIVE_DRAW_FMM_PATH_MAX_POINTS)
+        if max_pts > 0:
+            n_pts = len(range(0, len(rc_path), step_skip))
+            if n_pts > max_pts:
+                step_skip = max(1, int(len(rc_path) / max_pts))
 
         # ===== 当前机器人位姿 =====
         base_pos = self.env.root_states[0, :3].cpu().numpy()
@@ -1390,7 +1419,8 @@ class Evaluator:
 
             # --- 设置球位置 ---
             pose = gymapi.Transform()
-            pose.p = self._get_draw_position(wx, wy, sphere_radius, clearance=0.06)
+            pose.p = self._get_draw_position(wx, wy, sphere_radius,
+                                             clearance=DRAW_FMM_PATH_CLEARANCE_M)
 
             # --- 画球 ---
             gymutil.draw_lines(
@@ -1402,15 +1432,17 @@ class Evaluator:
             )
     def _calculate_smoothness(self, path_rc):
             # 如果路径点太少，返回一个标识值，后续会被过滤掉
-            if path_rc is None or len(path_rc) < 5: 
+            if path_rc is None or len(path_rc) < METRIC_SMOOTH_MIN_POINTS:
                 return 0.0 # 或者返回 -1.0 
             
-            pts = np.array(path_rc) * 0.05 
+            # 与 _record 路径长度处保持一致：栅格坐标 -> 米，跟着 BEV_RES 走。
+            # 角度本身是尺度无关的，但下面 norms 的阈值判断依赖实际米数。
+            pts = np.array(path_rc) * BEV_RES
             vecs = np.diff(pts, axis=0)
             
             # 防止分母为 0 的微小位移检查
             norms = np.linalg.norm(vecs, axis=1)
-            if np.sum(norms) < 0.01: return 0.0
+            if np.sum(norms) < METRIC_SMOOTH_MIN_PATH_LEN_M: return 0.0
 
             angles = np.arctan2(vecs[:, 1], vecs[:, 0])
             angle_diffs = np.abs(np.diff(angles))

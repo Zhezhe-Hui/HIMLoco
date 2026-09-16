@@ -55,6 +55,18 @@ legged_gym/logs
 logs
 runs
 
+# ---------------------------------------------------------------------
+# assets/ 素材与产出目录约定（详见 legged_gym/legged_gym/envs/go2/viz_config.py）
+#   assets/paper/   原论文素材（配图与 PDF）      -> 入库
+#   assets/figs/    论文出图（trajectory/metrics/summary） -> 入库
+#   assets/data/    实验数据（compare/trajectories）      -> 入库
+#   assets/archive/ 旧压缩包等归档                       -> 入库
+#   assets/runs/    运行时产出（截图/相机帧），随时可重新生成 -> 不入库
+# 注意：历史上已用 git mv 迁入 assets/runs/ 的素材仍被跟踪，
+#       下面的规则只影响之后新生成的文件。
+# ---------------------------------------------------------------------
+assets/runs/
+
 # other
 *.egg-info
 __pycache__

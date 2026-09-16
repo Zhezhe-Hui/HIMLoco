@@ -15,6 +15,7 @@ class RRTController:
         yaw_k=2.0,
         lookahead_m=0.6,
         inflate_radius_m=0.25,
+        goal_min_forward_m=0.10,
     ):
         self.bev_res = float(bev_res)
         self.bev_x = float(bev_x)
@@ -23,6 +24,7 @@ class RRTController:
         self.yaw_k = float(yaw_k)
         self.lookahead_m = float(lookahead_m)
         self.inflate_radius_m = float(inflate_radius_m)
+        self.goal_min_forward_m = float(goal_min_forward_m)
 
         self.H = int(self.bev_x / self.bev_res)
         self.W = int(self.bev_y / self.bev_res)
@@ -43,7 +45,7 @@ class RRTController:
         gx_m, gy_m = float(goal_xy_bev[0]), float(goal_xy_bev[1])
 
         # 钳制目标点，防止越界
-        gx_m = max(gx_m, 0.10)
+        gx_m = max(gx_m, self.goal_min_forward_m)
         gr = int(np.clip(gx_m / self.bev_res, 0, self.H - 1))
         gc = int(np.clip(gy_m / self.bev_res + (self.W // 2), 0, self.W - 1))
 

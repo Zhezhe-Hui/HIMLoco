@@ -27,6 +27,10 @@ class BEVMapper:
         v_start_ratio=0.55,
         height_range_thresh=0.25,  #  关键阈值
         min_points=8,
+        # 以下参数由 viz_config.py 第十四节统一配置
+        min_depth=0.05,             # 最小有效深度 (m)
+        enable_memory_fusion=False, # 是否用时序融合（即时 ∪ 历史记忆）
+        memory_max_age=30,          # 记忆寿命（帧）
     ):
         self.bev_x = bev_x
         self.bev_y = bev_y
@@ -34,9 +38,11 @@ class BEVMapper:
         self.cam_height = cam_height
         self.hfov_deg = hfov_deg
         self.max_depth = max_depth
+        self.min_depth = min_depth
         self.v_start_ratio = v_start_ratio
         self.height_range_thresh = height_range_thresh
         self.min_points = min_points
+        self.enable_memory_fusion = bool(enable_memory_fusion)
 
         self.H = int(bev_x / bev_res)
         self.W = int(bev_y / bev_res)
@@ -45,7 +51,7 @@ class BEVMapper:
         self.occ_age = np.zeros((self.H, self.W), dtype=np.int32)
 
         # 记忆寿命（单位：帧）
-        self.max_age = 30   # ≈ 1 秒（如果 dt≈0.03）
+        self.max_age = int(memory_max_age)
 
         self.reset()
 
@@ -79,7 +85,7 @@ class BEVMapper:
         v0 = int(self.v_start_ratio * H_img)
 
         d = np.nan_to_num(depth_m, nan=0.0, posinf=0.0, neginf=0.0)
-        d[(d < 0.05) | (d > self.max_depth)] = 0.0
+        d[(d < self.min_depth) | (d > self.max_depth)] = 0.0
 
         # 只取下半部分图像
         d_roi = d[v0:H_img, :]
@@ -157,10 +163,10 @@ class BEVMapper:
         # 2) 更新记忆
         self.update_memory(occ_now)
 
-        # 3) 给规划器的障碍 = 即时 ∪ 记忆
-        occ_for_planner = np.maximum(occ_now, self.occ_memory)
-
-        # return occ_for_planner # 切换瞬时记忆和时序融合的开关
+        # 3) 给规划器的障碍 = 即时 ∪ 记忆（时序融合）；关闭时只用当前帧
+        #    开关来自 viz_config.BEV_ENABLE_MEMORY_FUSION，不要再靠注释切换
+        if self.enable_memory_fusion:
+            return np.maximum(occ_now, self.occ_memory)
         return occ_now
 
     def shift_with_motion(self, dx_w, dy_w, yaw):
@@ -243,6 +249,7 @@ class FMMGradientController:
         yaw_k=2.0,              # 把“期望方向角”转成 wz 的比例
         lookahead_m=0.6,        # 在前方 lookahead 处取梯度，避免 r=0 视野太近导致 dc≈0
         inflate_radius_m=0.15,  # 障碍膨胀（接近原项目的 config space 思想）
+        goal_min_forward_m=0.10,  # goal 在身后时钳到前方的最小值
     ):
         self.bev_res = float(bev_res)
         self.bev_x = float(bev_x)
@@ -251,6 +258,7 @@ class FMMGradientController:
         self.yaw_k = float(yaw_k)
         self.lookahead_m = float(lookahead_m)
         self.inflate_radius_m = float(inflate_radius_m)
+        self.goal_min_forward_m = float(goal_min_forward_m)
 
         self.H = int(self.bev_x / self.bev_res)
         self.W = int(self.bev_y / self.bev_res)
@@ -267,7 +275,7 @@ class FMMGradientController:
         gx_m, gy_m = float(goal_xy_bev[0]), float(goal_xy_bev[1])
 
         # 局部规划：goal 在身后会导致梯度怪象，钳到前方一点
-        gx_m = max(gx_m, 0.10)
+        gx_m = max(gx_m, self.goal_min_forward_m)
 
         gr = int(gx_m / self.bev_res)
         gc = int(gy_m / self.bev_res) + (self.W // 2)
