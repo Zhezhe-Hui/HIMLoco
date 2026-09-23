@@ -575,6 +575,43 @@ class LeggedRobot(BaseTask):
             self.gym.set_dof_state_tensor_indexed(self.sim,
                                                 gymtorch.unwrap_tensor(self.dof_state),
                                                 gymtorch.unwrap_tensor(robot_indices), len(robot_indices))
+
+    @staticmethod
+    def _sample_separated_xy(count, x_range, y_range, min_separation, rng=None):
+            """Uniformly sample obstacle centers with a minimum pairwise distance."""
+            rng = np.random if rng is None else rng
+            points = []
+            attempts = 0
+            max_attempts = max(1000, int(count) * 300)
+            min_sep_sq = float(min_separation) ** 2
+            while len(points) < int(count) and attempts < max_attempts:
+                attempts += 1
+                candidate = np.array([
+                    rng.uniform(float(x_range[0]), float(x_range[1])),
+                    rng.uniform(float(y_range[0]), float(y_range[1])),
+                ], dtype=np.float32)
+                if all(float(np.sum((candidate - point) ** 2)) >= min_sep_sq
+                       for point in points):
+                    points.append(candidate)
+            if len(points) != int(count):
+                raise RuntimeError(
+                    "无法在区域 x=%s y=%s 内放置 %d 个最小间距 %.2fm 的障碍物"
+                    % (x_range, y_range, count, min_separation))
+            return points
+
+    def _randomize_navigation_obstacles(self, env_ids):
+            """Reject unsafe reset-time relocation of fixed GPU PhysX actors."""
+            stone_cfg = getattr(self.cfg, "stone", None)
+            tree_cfg = getattr(self.cfg, "static_obstacles", None)
+            randomize_stones = bool(getattr(stone_cfg, "randomize_each_reset", False))
+            randomize_trees = bool(getattr(tree_cfg, "randomize_each_reset", False))
+            if randomize_stones or randomize_trees:
+                raise RuntimeError(
+                    "GPU PhysX 不支持仿真启动后移动 fix_base_link 静态障碍。"
+                    "请使用 randomize_at_creation，并通过 HIMLOCO_SCENE_SEED "
+                    "为每个进程生成新布局。")
+            return []
+
     def _reset_root_states(self, env_ids):
             """ Resets ROOT states position and velocities of selected environmments
                 Sets base position based on the curriculum
@@ -603,11 +640,36 @@ class LeggedRobot(BaseTask):
                                  - 1.0) * jitter
                     robot_states_update[:, :2] += xy_offset
             else:
-                # 固定出生点：导航评测需要每次 trial 起点一致
+                # 固定世界坐标模式也可按范围逐 trial 随机，供随机直线走廊评测。
                 fixed = tuple(getattr(spawn_cfg, "fixed_position", (6.0, 9.0, 0.4))
                               if spawn_cfg is not None else (6.0, 9.0, 0.4))
-                robot_states_update[:, 0] = float(fixed[0])
-                robot_states_update[:, 1] = float(fixed[1])
+                randomize_spawn = bool(getattr(spawn_cfg, "randomize_each_reset", False)) \
+                    if spawn_cfg is not None else False
+                if randomize_spawn:
+                    x_range = tuple(getattr(spawn_cfg, "random_x_range", (fixed[0], fixed[0])))
+                    y_range = tuple(getattr(spawn_cfg, "random_y_range", (fixed[1], fixed[1])))
+                    trial_seed = getattr(self, "navigation_trial_seed", None)
+                    if trial_seed is not None:
+                        xy_values = []
+                        for env_id in env_ids.detach().cpu().tolist():
+                            rng = np.random.RandomState(int(trial_seed) + int(env_id))
+                            xy_values.append([
+                                rng.uniform(float(x_range[0]), float(x_range[1])),
+                                rng.uniform(float(y_range[0]), float(y_range[1])),
+                            ])
+                        xy_tensor = torch.tensor(
+                            xy_values, dtype=robot_states_update.dtype, device=self.device)
+                        robot_states_update[:, 0:2] = xy_tensor
+                    else:
+                        robot_states_update[:, 0] = (
+                            torch.rand(num_resets, device=self.device)
+                            * (float(x_range[1]) - float(x_range[0])) + float(x_range[0]))
+                        robot_states_update[:, 1] = (
+                            torch.rand(num_resets, device=self.device)
+                            * (float(y_range[1]) - float(y_range[0])) + float(y_range[0]))
+                else:
+                    robot_states_update[:, 0] = float(fixed[0])
+                    robot_states_update[:, 1] = float(fixed[1])
                 robot_states_update[:, 2] = float(fixed[2])
 
             vel_range = float(getattr(spawn_cfg, "init_velocity_range", 1.0)) \
@@ -617,16 +679,25 @@ class LeggedRobot(BaseTask):
                     (torch.rand(num_resets, 6, device=self.device) - 0.5) * vel_range
             self.all_root_states[robot_indices] = robot_states_update
 
+            # 静态障碍已在 actor 创建前确定位置，reset 时绝不移动；这里只提交机器人。
+            obstacle_indices = self._randomize_navigation_obstacles(env_ids)
+
             # === 2. 更新物理引擎 ===
             # 关键修改：只将机器人的索引传给物理引擎
             # 石头的索引不传进去，物理引擎就不会去更新它们的位置
-            robot_indices_int32 = robot_indices.to(dtype=torch.int32)
+            if obstacle_indices:
+                obstacle_indices_tensor = torch.tensor(
+                    obstacle_indices, dtype=torch.long, device=self.device)
+                actor_indices = torch.cat((robot_indices, obstacle_indices_tensor))
+            else:
+                actor_indices = robot_indices
+            actor_indices_int32 = actor_indices.to(dtype=torch.int32)
 
             self.gym.set_actor_root_state_tensor_indexed(
                 self.sim,
                 gymtorch.unwrap_tensor(self.all_root_states),
-                gymtorch.unwrap_tensor(robot_indices_int32),
-                len(robot_indices_int32)
+                gymtorch.unwrap_tensor(actor_indices_int32),
+                len(actor_indices_int32)
             )
 
     def _push_robots(self):
@@ -1162,9 +1233,18 @@ class LeggedRobot(BaseTask):
 
     def _create_static_obstacles(self, env_handle, env_id):
         handles = []
+        random_positions = getattr(self, "_creation_random_tree_positions", None)
+        random_cursor = 0
         for spec in self.static_obstacle_specs:
             obstacle_rotation = self._quat_from_euler_xyz(spec["rpy"])
             for obstacle_id, position_cfg in enumerate(spec["positions"]):
+                if random_positions is not None:
+                    position_cfg = [
+                        float(random_positions[random_cursor][0]),
+                        float(random_positions[random_cursor][1]),
+                        float(getattr(self.cfg.static_obstacles, "random_z_offset", 0.02)),
+                    ]
+                    random_cursor += 1
                 obstacle_pose = gymapi.Transform()
                 obstacle_pose.p = self._get_static_obstacle_position(position_cfg, env_id, spec)
                 obstacle_pose.r = obstacle_rotation
@@ -1244,6 +1324,31 @@ class LeggedRobot(BaseTask):
         self._load_static_obstacle_assets()
         self.num_static_obstacle_actors = sum(len(spec["positions"]) for spec in self.static_obstacle_specs)
         self.num_static_obstacle_bodies = sum(spec["num_bodies"] * len(spec["positions"]) for spec in self.static_obstacle_specs)
+
+        # Static PhysX actors cannot be moved after GPU simulation starts.  Sample
+        # the whole stone/tree layout before actor creation so visual and collision
+        # geometry are born at the same pose.  A new process/seed gives a new layout.
+        random_at_creation = bool(
+            getattr(getattr(self.cfg, "stone", None), "randomize_at_creation", False)
+            or getattr(getattr(self.cfg, "static_obstacles", None),
+                       "randomize_at_creation", False))
+        self._creation_random_stone_positions = None
+        self._creation_random_tree_positions = None
+        if random_at_creation:
+            source_cfg = (self.cfg.stone if num_big_stones > 0
+                          else self.cfg.static_obstacles)
+            x_range = tuple(getattr(source_cfg, "random_spawn_x", (12.0, 24.0)))
+            y_range = tuple(getattr(source_cfg, "random_spawn_y", (0.0, 12.0)))
+            min_sep = float(getattr(source_cfg, "random_min_separation", 1.4))
+            seed = int(getattr(source_cfg, "random_seed", 0))
+            positions = self._sample_separated_xy(
+                num_big_stones + self.num_static_obstacle_actors,
+                x_range, y_range, min_sep,
+                rng=np.random.RandomState(seed + 100000))
+            self._creation_random_stone_positions = positions[:num_big_stones]
+            self._creation_random_tree_positions = positions[num_big_stones:]
+            print("[legged_robot] 静态障碍在创建期随机化: seed=%d, 大石头=%d, 树=%d"
+                  % (seed, num_big_stones, self.num_static_obstacle_actors))
 
         self.stone_handles = [[] for _ in range(self.num_envs)]
         self.static_obstacle_handles = [[] for _ in range(self.num_envs)]
@@ -1371,6 +1476,8 @@ class LeggedRobot(BaseTask):
                 spawn_y_min, spawn_y_max = self.cfg.stone.stone_spawn_y
                 big_scale = float(getattr(self.cfg.stone, "big_stone_scale", 1.0))
                 big_positions = list(getattr(self.cfg.stone, "big_stone_positions", []) or [])
+                if self._creation_random_stone_positions is not None:
+                    big_positions = self._creation_random_stone_positions
                 small_static = bool(self._stone_cfg_get("small_static", True))
                 # 静态石头不会自由落体，直接贴地放置；动态时仍从 h_offset 抛下
                 small_z_offset = float(self._stone_cfg_get("small_static_z_offset", 0.01)

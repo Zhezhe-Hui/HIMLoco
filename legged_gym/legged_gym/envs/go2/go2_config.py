@@ -19,6 +19,13 @@ class Go2RoughCfg( LeggedRobotCfg ):
         # 性能开关（见 viz_config.py 第十三节）：树的高模 mesh cooking 是构建耗时主因
         reuse_duplicate_assets = VIZ.SCENE_TREE_REUSE_DUPLICATE_ASSETS
         vhacd_enabled = VIZ.SCENE_TREE_VHACD
+        randomize_each_reset = False
+        randomize_at_creation = VIZ.SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL
+        random_seed = VIZ.SCENE_RANDOM_SEED_BASE
+        random_spawn_x = VIZ.SCENE_RANDOM_OBSTACLE_X
+        random_spawn_y = VIZ.SCENE_RANDOM_OBSTACLE_Y
+        random_min_separation = VIZ.SCENE_RANDOM_OBSTACLE_MIN_SEPARATION_M
+        random_z_offset = VIZ.SCENE_RANDOM_TREE_Z_OFFSET
         _all_assets = [
             {
                 "name": "deadwood",
@@ -78,6 +85,12 @@ class Go2RoughCfg( LeggedRobotCfg ):
         small_scale_steps = VIZ.SCENE_SMALL_STONE_SCALE_STEPS
         small_collision = VIZ.SCENE_SMALL_STONE_COLLISION
         big_collision = VIZ.SCENE_BIG_STONE_COLLISION
+        randomize_each_reset = False
+        randomize_at_creation = VIZ.SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL
+        random_seed = VIZ.SCENE_RANDOM_SEED_BASE
+        random_spawn_x = VIZ.SCENE_RANDOM_OBSTACLE_X
+        random_spawn_y = VIZ.SCENE_RANDOM_OBSTACLE_Y
+        random_min_separation = VIZ.SCENE_RANDOM_OBSTACLE_MIN_SEPARATION_M
 
     class spawn(LeggedRobotCfg.spawn):
         """机器人出生点，全部来自 viz_config.py 第十一·B 节。"""
@@ -85,6 +98,9 @@ class Go2RoughCfg( LeggedRobotCfg ):
         fixed_position = tuple(VIZ.SPAWN_FIXED_POSITION)
         origin_xy_jitter = VIZ.SPAWN_ORIGIN_XY_JITTER
         init_velocity_range = VIZ.SPAWN_INIT_VELOCITY_RANGE
+        randomize_each_reset = VIZ.SPAWN_RANDOMIZE_EACH_TRIAL
+        random_x_range = VIZ.SPAWN_RANDOM_X_RANGE
+        random_y_range = VIZ.SPAWN_RANDOM_Y_RANGE
 
     class camera(LeggedRobotCfg.camera):
         """深度相机参数，全部来自 viz_config.py 第十四节。"""

@@ -48,6 +48,7 @@ from legged_gym.envs.go2.pathplanner import SimplePlanner,Evaluator
 # =====================================================================
 from legged_gym.envs.go2.viz_config import (
     NUM_TRIALS, RENDER, PLANNER_MODE, WAYPOINTS, EXPORT_POLICY, NUM_ENVS,
+    NAV_EPISODE_LENGTH_S,
 )
 from legged_gym.envs.go2.viz_config import ensure_dirs as _ensure_viz_dirs, summary as _viz_summary
 from legged_gym.envs.go2.viz_config import (
@@ -68,6 +69,7 @@ def play(args):
         mode=PLANNER_MODE,
     )
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
+    env_cfg.env.episode_length_s = float(NAV_EPISODE_LENGTH_S)
     # override some parameters for testing
     # 原来硬编码 min(cfg, 50)，50 个 env × 1000 石头会 PhysX OOM，改由 viz_config.NUM_ENVS 控制
     env_cfg.env.num_envs = NUM_ENVS

@@ -275,6 +275,10 @@ class LeggedRobotCfg(BaseConfig):
         fixed_position = (6.0, 9.0, 0.4)
         #: use_env_origins=True 时，xy 方向的随机抖动幅度 [m]
         origin_xy_jitter = 1.0
+        #: 固定世界坐标模式下，也可在每次 reset 从给定范围随机出生。
+        randomize_each_reset = False
+        random_x_range = (6.0, 6.0)
+        random_y_range = (3.0, 9.0)
         #: 重置时给机器人的随机初速度范围（线性速度 + 角速度，共 6 维）
         #: 实现为 rand()-0.5 再乘该幅度，0 = 不给初速度
         init_velocity_range = 1.0

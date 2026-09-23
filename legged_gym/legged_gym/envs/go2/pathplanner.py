@@ -15,6 +15,10 @@ from legged_gym.envs.go2.bev_height_mapper import BEVMapper,FMMGradientControlle
 from legged_gym.envs.go2.bev_height_mapper import plot_all_trials,plot_all_saved_trajectories
 from legged_gym.envs.go2.rrt_planner import RRTController
 from legged_gym.envs.go2.a_star_dwa_planner import AStarDWAController
+from legged_gym.envs.go2.mppi_local_planner import (
+    FootprintMPPIController,
+    WorldObstacleMemory,
+)
 
 # =====================================================================
 #  所有可视化 / 截图 / 出图开关已统一迁移到 viz_config.py
@@ -29,6 +33,70 @@ print("[viz_config] " + _viz_summary())
 
 class MemoryGuardExceeded(RuntimeError):
     """进程 RSS 超过 SAFETY_MEM_LIMIT_GB，主动中止评测以免拖死整机。"""
+
+
+def _diagnose_termination(env, cmd_vx=None, cmd_wz=None):
+    """把 reset_buf 的合并结果反推成可读的终止原因（碰撞/卡住/掉落/超时）。
+
+    check_termination 只把四项 or 进 reset_buf，上层拿到 dones=True 无法区分。
+    这里按同样的判据重新算一遍（只针对 env0），用于诊断成功率下降的真正原因。
+
+    ⚠ cmd_vx / cmd_wz 必须由调用方【显式传入】（2026-09-17 修复的测量缺陷）：
+      本函数在 env.step() 【返回之后】才被调用，而 step() 内部顺序是
+        post_physics_step -> check_termination -> reset_idx(env_ids)
+                                            -> _resample_commands(env_ids)  ← 无条件
+      reset_idx 会把 commands 重采样成随机值（lin_vel_x/y ∈ [-1,1]，
+      ‖·‖ 最大 1.41），所以此处直接读 env.commands 拿到的是【重置后的随机指令】，
+      不是规划器当步真正下发的那个值。
+      实测铁证：诊断打印“指令 1.16 / 1.19 / 1.25”，而 NAV_FORWARD_VX=1.0，
+      规划器根本不可能下发这么大的值 —— 全部是重采样来的噪声，
+      导致“卡住”判据长期在拿错误指令做诊断，误导了此前所有调参结论。
+      （base_lin_vel 与 contact_forces 在 reset 前已算好并各自缓存，读它们仍有效。）
+      不传这两个参数时退回旧行为（读 env.commands），仅用于离线复现。
+    """
+    try:
+        import torch
+        term_cfg = getattr(env.cfg, "termination", None)
+        reasons = []
+        # 碰撞：终止部位接触力超阈值
+        thresh = float(getattr(term_cfg, "collision_force_threshold", 1.0)) \
+            if term_cfg is not None else 1.0
+        force = torch.norm(
+            env.contact_forces[0, env.termination_contact_indices, :], dim=-1)
+        if bool(torch.any(force > thresh)):
+            reasons.append("碰撞(接触力%.1fN>%.1fN)" % (force.max().item(), thresh))
+        # 掉落/悬崖
+        if term_cfg is None or getattr(term_cfg, "enable_cliff_fall", True):
+            limit = float(getattr(term_cfg, "cliff_fall_height", -0.5)) \
+                if term_cfg is not None else -0.5
+            if float(env.root_states[0, 2].item()) < limit:
+                reasons.append("掉落(z=%.2f<%.2f)" % (env.root_states[0, 2].item(), limit))
+        # 卡住
+        if term_cfg is not None and getattr(term_cfg, "enable_stuck", True):
+            if cmd_vx is None:
+                cmd_sp = float(torch.norm(env.commands[0, :2]).item())
+            else:
+                # 用规划器当步真实下发的指令（只有 vx 参与 ‖·‖，wz 是角速度）
+                cmd_sp = abs(float(cmd_vx))
+            act_sp = float(torch.norm(env.base_lin_vel[0, :2]).item())
+            # 角速度与朝向变化率：区分“真卡住”和“原地转向”（假卡住）。
+            #   base_lin_vel 是【机体坐标系】线速度：机器狗原地打转时它≈0，
+            #   但 yaw rate 很大、位置仍在变化，此时 stuck 判据会误杀。
+            #   stuck_steps_threshold 只有 1s，一次 waypoint 急转就可能触发。
+            yaw_rate = float(env.base_ang_vel[0, 2].item())
+            if (cmd_sp > float(getattr(term_cfg, "stuck_cmd_speed_min", 0.3))
+                    and act_sp < float(getattr(term_cfg, "stuck_actual_speed_max", 0.05))):
+                reasons.append("卡住(指令%.2f实际%.3f yawrate%+.2f)" % (cmd_sp, act_sp, yaw_rate))
+        # 姿态：摔倒的直接证据（roll/pitch 过大）
+        quat = env.base_quat[0]
+        w, x, y, z = quat[3].item(), quat[0].item(), quat[1].item(), quat[2].item()
+        roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
+        pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1.0, 1.0))
+        if abs(roll) > 0.6 or abs(pitch) > 0.6:
+            reasons.append("姿态失衡(roll=%.2f pitch=%.2f)" % (roll, pitch))
+        return "、".join(reasons) if reasons else "未命中任一判据(可能是上一步累积的 stuck 计数)"
+    except Exception as err:   # 诊断失败绝不该影响主流程
+        return "诊断异常: %r" % (err,)
 
 
 def _read_self_rss_gb():
@@ -54,7 +122,11 @@ class SimplePlanner:
         self.current_id = 0
         self.finished = False
         self.visited = [False] * len(self.waypoints)
-        self.last_update_time = 0.0  
+        self.last_update_time = 0.0
+
+    def set_waypoints(self, waypoints):
+        self.waypoints = [np.array(wp[:2], dtype=np.float32) for wp in waypoints]
+        self.reset()
 
 class Evaluator:
     def __init__(self, env, policy, planner,
@@ -99,10 +171,29 @@ class Evaluator:
             min_depth=BEV_MIN_DEPTH,
             enable_memory_fusion=BEV_ENABLE_MEMORY_FUSION,
             memory_max_age=BEV_MEMORY_MAX_AGE,
+            # 跨格台阶判据：修复“正对垂直墙面漏检”（见 viz_config.BEV_ENABLE_STEP_JUDGE）
+            enable_step_judge=BEV_ENABLE_STEP_JUDGE,
+            step_thresh=BEV_STEP_THRESH,
+            step_span=BEV_STEP_SPAN,
+            # 相机几何标定结论（2026-09-16 实测）：横向符号 / 轴向深度针孔 / 俯角
+            pitch_deg=BEV_CAM_PITCH_DEG,
+            lateral_sign=BEV_LATERAL_SIGN,
+            use_axial_geom=BEV_USE_AXIAL_GEOM,
+            clip_invalid_eps=BEV_CLIP_INVALID_EPS,
+            min_range=BEV_MIN_RANGE_M,
         )
         self.last_occ = None
+        # 前向净空速度调制的限幅状态（上一个实际下发的 cmd_vx）。
+        # 每个 trial 开始时重置回全速，避免把上一轮末尾的低速带进新一轮。
+        self._last_cmd_vx = float(NAV_FORWARD_VX)
+        # 便于诊断：记录本次 trial 的净空距离/vx 轨迹
+        self.trial_clearance_log = []
+        self.trial_narrow_steps = 0
+        self.trial_min_path_clearance = float("inf")
+        self.trial_memory_max_points = 0
         self.mode = mode
-        if self.mode == 'fmm':
+        self.mppi = None
+        if self.mode in ('fmm', 'mppi'):
             self.fmm = FMMGradientController(
                 bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
                 max_wz=FMM_MAX_WZ,
@@ -110,7 +201,38 @@ class Evaluator:
                 lookahead_m=FMM_LOOKAHEAD_M,
                 inflate_radius_m=FMM_INFLATE_RADIUS_M,
                 goal_min_forward_m=FMM_GOAL_MIN_FORWARD_M,
+                use_soft_cost=FMM_USE_SOFT_COST,
+                hard_radius_m=FMM_HARD_RADIUS_M,
+                soft_clearance_m=FMM_SOFT_CLEARANCE_M,
+                soft_cost_weight=FMM_SOFT_COST_WEIGHT,
+                soft_cost_power=FMM_SOFT_COST_POWER,
+                # 转向决策锁存：压住对称鞍点处 wz 的逐步振荡（见 viz_config.FMM_TURN_*）
+                hysteresis_thresh=(FMM_TURN_HYSTERESIS_THRESH
+                                   if FMM_TURN_HYSTERESIS_ENABLE else 0.0),
+                hysteresis_hold_steps=(int(FMM_TURN_HOLD_STEPS)
+                                       if FMM_TURN_HYSTERESIS_ENABLE else 0),
+                max_wz_accel=FMM_MAX_WZ_ACCEL,
+                control_dt=float(self.env.dt),
+                unreachable_turn_wz=FMM_UNREACHABLE_TURN_WZ,
+                use_path_lookahead=FMM_USE_PATH_LOOKAHEAD,
+                open_space_yaw_deadband=FMM_OPEN_SPACE_YAW_DEADBAND_RAD,
             )
+            if self.mode == 'mppi':
+                self.mppi = FootprintMPPIController(
+                    bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
+                    horizon=MPPI_HORIZON,
+                    num_samples=MPPI_NUM_SAMPLES,
+                    rollout_dt=MPPI_ROLLOUT_DT,
+                    max_vx=MPPI_MAX_VX,
+                    min_vx=MPPI_MIN_VX,
+                    max_wz=MPPI_MAX_WZ,
+                    footprint_length_m=MPPI_FOOTPRINT_LENGTH_M,
+                    footprint_width_m=MPPI_FOOTPRINT_WIDTH_M,
+                    safety_margin_m=MPPI_FOOTPRINT_MARGIN_M,
+                    temperature=MPPI_TEMPERATURE,
+                    noise_vx=MPPI_NOISE_VX,
+                    noise_wz=MPPI_NOISE_WZ,
+                )
         elif self.mode == 'rrt':
             self.fmm = RRTController(
                 bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
@@ -128,6 +250,16 @@ class Evaluator:
                 dt=DWA_DT, predict_time=DWA_PREDICT_TIME,
                 inflate_radius_m=DWA_INFLATE_RADIUS_M,
             )
+        else:
+            raise ValueError("unknown planner mode: %r" % self.mode)
+        self.temporal_memory = WorldObstacleMemory(
+            bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
+            max_age_steps=TEMPORAL_MEMORY_MAX_AGE_STEPS,
+            voxel_size_m=TEMPORAL_MEMORY_VOXEL_M,
+            max_points=TEMPORAL_MEMORY_MAX_POINTS,
+        )
+        self._use_temporal_memory = bool(
+            TEMPORAL_MEMORY_ENABLE and self.mode == 'mppi')
         # ==================== 加这三行 ====================
         self.save_trajectory_dir = SAVE_TRAJECTORY_DIR
         os.makedirs(self.save_trajectory_dir, exist_ok=True)
@@ -150,8 +282,22 @@ class Evaluator:
         # ==================================================
     def run_single_trial(self, trial_id=0):
         print(f"\n===== Trial {trial_id} =====")
-        self.planner.reset()
+        if NAV_RANDOM_STRAIGHT_ROUTE or SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL:
+            # 场景随机数只由 trial_id 决定，不受上一轮运行步数/算法内部随机消耗影响。
+            self.env.navigation_trial_seed = int(SCENE_RANDOM_SEED_BASE) + int(trial_id)
         self.env.reset()
+        # 随机直线走廊：终点与本轮实际出生点保持同一 y，不再经过旧折线航点。
+        if NAV_RANDOM_STRAIGHT_ROUTE:
+            start_x = float(self.env.root_states[0, 0].item())
+            start_y = float(self.env.root_states[0, 1].item())
+            self.planner.set_waypoints([(float(NAV_STRAIGHT_GOAL_X), start_y)])
+            print("随机直线路线: start=(%.2f, %.2f), goal=(%.2f, %.2f)"
+                  % (start_x, start_y, NAV_STRAIGHT_GOAL_X, start_y))
+            print("出生点 trial seed: %d | 静态障碍 seed: %d"
+                  % (int(self.env.navigation_trial_seed), int(SCENE_RANDOM_SEED_BASE)))
+            self._print_random_obstacle_layout()
+        else:
+            self.planner.reset()
         self._update_live_follow_camera()
         self._bev_vis_saved_count = 0
         self.state_log = []   # 清空日志
@@ -163,6 +309,23 @@ class Evaluator:
         self.trial_start_xy = None
         self.trial_fmm_world_segments = []
 
+        self._last_cmd_vx = float(NAV_FORWARD_VX)   # 速度调制限幅状态复位
+        self.trial_clearance_log = []
+        self.trial_narrow_steps = 0
+        self.trial_min_path_clearance = float("inf")
+        self.trial_memory_max_points = 0
+        # 停滞逃逸状态复位（见 _reset_stall_escape / viz_config.STALL_*）
+        self._reset_stall_escape()
+        # 转向锁存状态复位：不把上一轮的转向惯性带进新一轮
+        if hasattr(self.fmm, "reset_hysteresis"):
+            self.fmm.reset_hysteresis()
+        self.temporal_memory.reset()
+        if self.mppi is not None:
+            self.mppi.reset()
+        self._mppi_active = False
+        self._cached_mppi_cmd = (float(NAV_FORWARD_VX), 0.0)
+        self._cached_raw_path = []
+        self._planner_reachable = True
         self.trial_step_times = []  # 必须初始化，否则 A* 报错
         self.trial_total_length = 0
         self.trial_real_distance = 0.0  # 这里加
@@ -190,7 +353,7 @@ class Evaluator:
             base_yaw = self._get_base_yaw(0)
    
             # ===== A. 时间融合（在 update BEV 之前）=====
-            if prev_base_pos is not None:
+            if BEV_ENABLE_MEMORY_FUSION and prev_base_pos is not None:
                 dx = base_pos[0] - prev_base_pos[0]
                 dy = base_pos[1] - prev_base_pos[1]
                 self.bev.shift_with_motion(dx, dy, prev_base_yaw)
@@ -199,19 +362,39 @@ class Evaluator:
                 self.trial_start_xy = base_xy.copy()
             self.traj_xy_cur.append(base_xy)
             # ========== 新增：每一步真实行走距离 ==========
+            # step_dist 必须先给默认值：step 0 时 prev_base_pos 还是 None，
+            # 否则下面的停滞检测会读到未定义变量。
+            step_dist = 0.0
             if prev_base_pos is not None:
                 dx = base_pos[0] - prev_base_pos[0]
                 dy = base_pos[1] - prev_base_pos[1]
-                step_dist = np.hypot(dx, dy)
+                step_dist = float(np.hypot(dx, dy))
                 self.trial_real_distance += step_dist
             # ==============================================
             prev_base_pos = base_pos.copy()
             prev_base_yaw = base_yaw
 
             # ===== 4. 更新 BEV =====
-            self._update_camera_and_bev(step)
+            fresh_bev = self._update_camera_and_bev(step)
             # ===== 5. 唯一的 wz：BEV + goal =====
-            occ_bev = self.bev.get_obstacle_map()
+            occ_bev_raw = self.bev.get_obstacle_map()
+            # 障碍白名单：只保留【actor 障碍】（大石头/树/后续新增的动态障碍），
+            # 地形边界墙与地形凸起一律不参与避障（见 viz_config.BEV_OBSTACLE_ACTORS_ONLY）。
+            if BEV_OBSTACLE_ACTORS_ONLY:
+                occ_bev_now = self._mask_occ_to_actors(
+                    occ_bev_raw, base_pos, base_yaw)
+            else:
+                occ_bev_now = occ_bev_raw
+            if self._use_temporal_memory:
+                pose_xy_yaw = (base_pos[0], base_pos[1], base_yaw)
+                if fresh_bev:
+                    self.temporal_memory.update(occ_bev_now, pose_xy_yaw, step)
+                occ_bev = self.temporal_memory.project(pose_xy_yaw)
+                self.trial_memory_max_points = max(
+                    self.trial_memory_max_points,
+                    self.temporal_memory.point_count)
+            else:
+                occ_bev = occ_bev_now
 
             # 3) 计算 waypoint 在机器人坐标（goal_xy_bev）
             wp = self.planner.waypoints[self.planner.current_id]
@@ -221,15 +404,19 @@ class Evaluator:
             dx_r = c * dx_w - s * dy_w   # forward
             dy_r = s * dx_w + c * dy_w   # left
 
-            # 4) FMM
-            self.fmm.set_goal((dx_r, dy_r))
-            start_plan_t = time.time()
-            #计算距离场保存
-            self.fmm.update(occ_bev)
-            # ===== 1. 计时规划 (所有算法通用) =====
-            self.trial_step_times.append((time.time() - start_plan_t) * 1000) # 存入 ms
-            # ===== 1. 提取 FMM 原始路径 =====
-            raw_path = self.fmm.extract_path()
+            # 4) FMM：重规划周期独立配置。当前按用户观感恢复到 50Hz；深度图
+            # 仍以 12.5Hz 更新，但机器人位姿与局部目标每个控制步都会变化。
+            replan_interval = max(1, int(FMM_REPLAN_INTERVAL_STEPS))
+            plan_due = step == 0 or step % replan_interval == 0
+            if plan_due:
+                self.fmm.set_goal((dx_r, dy_r))
+                start_plan_t = time.time()
+                self.fmm.update(occ_bev)
+                self.trial_step_times.append((time.time() - start_plan_t) * 1000)
+                self._cached_raw_path = self.fmm.extract_path()
+                if hasattr(self.fmm, "is_reachable"):
+                    self._planner_reachable = bool(self.fmm.is_reachable())
+            raw_path = self._cached_raw_path
             self._visualize_bev_fmm(step, trial_id, occ_bev, raw_path)
 
             # ===== 2. FMM路径（robot → world）=====
@@ -253,6 +440,53 @@ class Evaluator:
                     self.raw_path_all.append(raw_xy)
 
             wz = self.fmm.compute_wz()
+            planner_vx = None
+            if self.mppi is not None:
+                obstacle_active = bool(np.any(occ_bev))
+                if obstacle_active:
+                    if not self._mppi_active:
+                        self.mppi.reset()
+                        self._mppi_active = True
+                    mppi_due = (step == 0 or step % max(
+                        1, int(MPPI_REPLAN_INTERVAL_STEPS)) == 0)
+                    if mppi_due:
+                        local_path_xy = np.asarray([
+                            (r * self.fmm.bev_res,
+                             (col - self.fmm.W // 2) * self.fmm.bev_res)
+                            for r, col in raw_path
+                        ], dtype=np.float64)
+                        start_mppi_t = time.time()
+                        self._cached_mppi_cmd = self.mppi.command(
+                            occ_bev, local_path_xy, goal_xy=(dx_r, dy_r))
+                        mppi_ms = (time.time() - start_mppi_t) * 1000.0
+                        if self.trial_step_times:
+                            self.trial_step_times[-1] += mppi_ms
+                    planner_vx, wz = self._cached_mppi_cmd
+                else:
+                    # MPPI只负责有障碍的局部轨迹优化；空旷区沿用连续目标控制，
+                    # 避免采样噪声在24m长直线中累积成无意义的额外路程。
+                    self._mppi_active = False
+                    self._cached_mppi_cmd = (float(NAV_FORWARD_VX), float(wz))
+            narrow_passage = False
+            if (NARROW_PASSAGE_ENABLE and self._planner_reachable
+                    and hasattr(self.fmm, "path_min_clearance")):
+                path_clearance = self.fmm.path_min_clearance(
+                    NARROW_PASSAGE_LOOKAHEAD_M)
+                self.trial_min_path_clearance = min(
+                    self.trial_min_path_clearance, float(path_clearance))
+                narrow_passage = path_clearance < float(NARROW_PASSAGE_CLEARANCE_M)
+                if narrow_passage:
+                    self.trial_narrow_steps += 1
+                    wz = float(np.clip(
+                        wz, -NARROW_PASSAGE_MAX_WZ, NARROW_PASSAGE_MAX_WZ))
+            if NAV_DEBUG_START_STEPS > 0 and step < int(NAV_DEBUG_START_STEPS):
+                lookahead_point = raw_path[min(len(raw_path) - 1,
+                                               max(0, int(FMM_LOOKAHEAD_M / BEV_RES)))] \
+                    if raw_path else None
+                print("[start-debug] step=%d yaw=%+.3f goal_robot=(%+.2f,%+.2f) "
+                      "occ=%d reachable=%s lookahead=%s wz=%+.3f"
+                      % (step, base_yaw, dx_r, dy_r, int(np.count_nonzero(occ_bev)),
+                         self._planner_reachable, lookahead_point, wz))
 
             # ===== 轨迹优化（仅用于可视化 / 分析 / 未来 MPC）=====
             # smooth_path = self.fmm.optimize_fmm_path(
@@ -261,10 +495,35 @@ class Evaluator:
             # --- 增加以下记录逻辑 ---
             current_smooth = self._calculate_smoothness(raw_path)
             # 只有当路径有效（不是兜底值或 0）时才加入统计
-            if METRIC_SMOOTH_VALID_MIN < current_smooth < METRIC_SMOOTH_VALID_MAX:
+            if (plan_due
+                    and METRIC_SMOOTH_VALID_MIN < current_smooth < METRIC_SMOOTH_VALID_MAX):
                 self.trial_step_smoothness.append(current_smooth)
             # ===== waypoint 切换 =====
-            if self.fmm.is_goal_reached(thresh_m=NAV_GOAL_REACH_THRESH_M):
+            # 越过中间航点平面即前进（GPS 导航标准行为）：
+            #   实测（blocker 场景）机器狗绕过石头后会【冲过】航点（如 wp1=(11,8)
+            #   被冲到 (12.2,7.6)），此时 goal 在机器人坐标系的前向分量为负，
+            #   set_goal 把它钳到 (0.1, 横向) => 纯横向目标 => wz 饱和原地打转，
+            #   而 is_goal_reached 的 0.25m 阈值永远不满足 => 永久卡死。
+            #   dx_r < -margin 表示航点已在身后 margin 米，直接判为通过。
+            n_wp = len(self.planner.waypoints)
+            is_final_goal = self.planner.current_id >= n_wp - 1
+            crossed = (NAV_ADVANCE_ON_CROSS and not is_final_goal
+                       and dx_r < -float(NAV_CROSS_MARGIN_M))
+            # 中间航点用更宽的到达阈值：实测（blocker 场景 wz 日志）goal 落在
+            # 最小转弯圆（v/wz_max ≈ 1.0m）内时，相对方位被锁在侧向 90°，
+            # wz 饱和 ±1.0 连续上百步、机器狗全速跑圈（纯追踪极限环），
+            # 0.3m 阈值永远不满足。中间航点只是途经点，1.0m 内即视为通过；
+            # 最终目标点仍用 NAV_GOAL_REACH_THRESH_M 保精度。
+            thresh = (NAV_MID_GOAL_REACH_THRESH_M
+                      if self.planner.current_id < n_wp - 1
+                      else NAV_GOAL_REACH_THRESH_M)
+            # 到达判定必须使用机器人与目标的真实欧氏距离。FMM 场在双层代价模式下是
+            # 加权 travel time，不再等于几何距离，用它会让到达半径随障碍代价变化。
+            goal_distance_m = float(np.hypot(dx_w, dy_w))
+            if goal_distance_m <= float(thresh) or crossed:
+                if is_final_goal:
+                    print("最终目标到达误差: %.3f m (阈值 %.3f m)"
+                          % (goal_distance_m, NAV_GOAL_REACH_THRESH_M))
                 if raw_path is not None and len(raw_path) > 1:
                     # 原来写死 * 0.05，改 bev_res 后路径长度会算错，这里跟着 BEV_RES 走
                     pts = np.array(raw_path) * BEV_RES
@@ -313,21 +572,51 @@ class Evaluator:
                     self._save_trial_route_plot(trial_id, status)
                     return self._handle_fail(reason, elapsed_time)
 
-            # 下发动作：vx 固定前进，wz 由高层规划器给出（速度见 viz_config.NAV_FORWARD_VX）
+            # 下发动作：wz 由高层规划器给出；vx 原本是【恒定的】NAV_FORWARD_VX，
+            # 现在按前向净空距离调制（见 viz_config.SPEED_MOD_*）。
+            # 这是“开了避障成功率反而下降”的修复：上层只转向不减速时，
+            # 机器狗会以 1.0m/s 全速撞上静态大石头（实测接触力 985N）而判摔。
+            # ⚠ 转向与刹车【用不同的障碍图】（2026-09-17 实测定标）：
+            #   · 转向 occ_bev：白名单图，只绕 actor 障碍（用户语义）。
+            #   · 刹车 occ_bev_raw：原始几何图，含边界墙与地形起伏。
+            #   为什么分开：转向问"要不要绕开它"（地形起伏四足就该踩过去，不绕），
+            #   刹车问"脚下这段地面要不要减速"（边界墙/陡坎仍应触发降速）。
+            #   白名单把 no_obstacles 障碍图归零后 clearance 恒为 3.0，
+            #   刹车会完全失去边界墙这类真障碍的降速信号，故单独喂原始图。
+            #   ⚠ 注：此处曾误判为"0.1m 地形台阶导致打滑卡死"。离线地形真值
+            #     与停滞取证探针已证伪：全域单格坡度中位 0.0%、p99 仅 5.5%，
+            #     离散障碍地形(id=4)实际用 discrete_obstacle_height_fixed=0.01m，
+            #     地面基本是平的。真正的死锁机制见 _update_stall_escape()。
+            fwd_clearance = self._forward_clearance(
+                occ_bev_raw if BEV_CLEARANCE_USE_RAW_MAP else occ_bev)
+            cmd_vx = self._modulate_vx(
+                fwd_clearance, self.env.dt, wz,
+                goal_distance=(goal_distance_m if is_final_goal else None),
+                speed_cap=(NARROW_PASSAGE_MAX_VX if narrow_passage else None))
+            if planner_vx is not None:
+                cmd_vx = min(float(cmd_vx), float(planner_vx))
+
+            if FMM_STOP_IF_UNREACHABLE and not self._planner_reachable:
+                cmd_vx = 0.0
+
+            # ===== 停滞逃逸：原地踏步死锁时接管指令（见 _update_stall_escape）=====
+            if FMM_STOP_IF_UNREACHABLE and not self._planner_reachable:
+                # 这是规划器主动停车，不是底层卡住；不要触发盲目倒退逃逸。
+                self._stall_travel_buf = []
+                in_escape = False
+            else:
+                in_escape = self._update_stall_escape(step_dist)
+            if in_escape and STALL_OVERRIDE_PLANNER:
+                esc = self._stall_escape_cmd()
+                if esc is not None:
+                    cmd_vx, wz = esc
+
+            self.trial_clearance_log.append((fwd_clearance, cmd_vx, float(wz)))
             self.env.commands[:] = 0.0
-            self.env.commands[0, 0] = NAV_FORWARD_VX
+            self.env.commands[0, 0] = cmd_vx
             self.env.commands[0, 2] = wz
             self._update_live_follow_camera()
             obs, _, _, dones, infos, _, _ = self.env.step(actions)
-            # 数据记录
-            real_vx = self.env.base_lin_vel[0, 0].detach().item()
-            torque = self.env.torques[0].detach().cpu().numpy()
-            torque_cost = np.sum(torque ** 2)
-            self.state_log.append({
-                "cmd_vx": float(self.env.commands[0, 0].item()),
-                "real_vx": real_vx,
-                "torque_cost": torque_cost
-            })
             # --- IsaacGym viewer 实时叠加可视化 ---
             # 节流：LIVE_DRAW_INTERVAL>1 时按间隔重画，省掉大量 add_lines/clear_lines
             if (LIVE_DRAW_VIEWER_OVERLAY and self.render
@@ -346,14 +635,33 @@ class Evaluator:
             # 12 个关节的瞬时扭矩（力矩）值 平方和
             torque = self.env.torques[0].detach().cpu().numpy()
             torque_cost = np.sum(torque ** 2)
+            roll, pitch, _ = self._quat_to_rpy(self.env.base_quat[0])
+            body_wx = float(self.env.base_ang_vel[0, 0].item())
+            body_wy = float(self.env.base_ang_vel[0, 1].item())
             self.state_log.append({
-                "cmd_vx": float(self.env.commands[0, 0].item()),
+                # 记录【规划器真实下发】的 cmd_vx，不回读 env.commands：
+                # 终止那一步 env.commands 已被 reset_idx 重采样成随机值（见
+                # _diagnose_termination 注释），回读会让速度跟踪曲线混入噪声。
+                "cmd_vx": float(cmd_vx),
+                "cmd_wz": float(wz),
                 "real_vx": real_vx,
-                "torque_cost": torque_cost
+                "torque_cost": torque_cost,
+                "roll": float(roll),
+                "pitch": float(pitch),
+                "body_wx": body_wx,
+                "body_wy": body_wy,
             })
 
             # 失败：环境终止
             if dones[0]:
+                # 细分终止原因：check_termination 把 collision|timeout|cliff|stuck 合并成
+                # 一个 reset_buf，光看 dones 无法区分是撞了还是卡住了还是掉了。
+                # 诊断“开避障后成功率反而下降”这类问题必须知道到底哪一种。
+                # ⚠ 必须显式传当步真实下发的 cmd_vx：env.step() 内部 reset_idx 已把
+                #   env.commands 重采样成随机值，此时再读它拿到的是噪声（见函数注释）。
+                #   cmd_vx 是本函数上文刚算出并下发的那个值，仍在局部作用域内。
+                term_reason = _diagnose_termination(self.env, cmd_vx=cmd_vx, cmd_wz=wz)
+                print(f"🔍 终止原因细分: {term_reason} (step {step})")
                 elapsed_time = step * self.env.dt
                 # self.traj_xy_all.append(np.array(self.traj_xy_cur))
                 # 保存本次轨迹到文件
@@ -365,6 +673,93 @@ class Evaluator:
                     print(f"✅ 轨迹已保存到: {save_path}")
                 self._save_trial_route_plot(trial_id, "environment_termination")
                 return self._handle_fail("environment termination", elapsed_time)
+
+    def _print_random_obstacle_layout(self):
+        """Print the current trial layout so failed cases can be reproduced and inspected."""
+        if not SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL:
+            return
+        groups = []
+        stones = getattr(self.env, "stone_root_states", None)
+        if stones is not None and stones.shape[1] > 0:
+            xy = stones[0, :, :2].detach().cpu().numpy()
+            groups.append("stones=" + str(np.round(xy, 2).tolist()))
+        trees = getattr(self.env, "static_obstacle_root_states", None)
+        if trees is not None and trees.shape[1] > 0:
+            xy = trees[0, :, :2].detach().cpu().numpy()
+            groups.append("trees=" + str(np.round(xy, 2).tolist()))
+        if groups:
+            print("随机障碍布局: " + " | ".join(groups))
+
+    def _reset_stall_escape(self):
+        """复位停滞逃逸状态机（每个 trial 开始时调用）。"""
+        self._stall_travel_buf = []      # 最近 STALL_WINDOW_STEPS 步的实际位移
+        self._stall_phase = "idle"       # idle / reverse / turn
+        self._stall_phase_left = 0       # 当前阶段还剩多少步
+        self._stall_escape_count = 0     # 本 trial 已逃逸次数
+        self._stall_turn_sign = 1.0      # 逃逸转向方向（交替用）
+
+    def _update_stall_escape(self, step_dist):
+        """更新停滞检测状态机，返回本步是否处于逃逸中（True 则上层指令被覆盖）。
+
+        为什么需要（2026-09-17 停滞取证探针实测，/tmp/pitch/logs/stall_probe.pkl）：
+          机器狗会在粗糙斜坡的坑洼里【原地踏步死锁】：位置纹丝不动
+          （(16.16,5.02) 持续 50+ 步），实际 vx 在 ±0.1 间抖动、yawrate 不跟踪 wz，
+          而 BEV 障碍图全零 -> 上层认为"前方通畅" -> 永远重复同一条指令 -> 死锁到
+          timeout。上层缺的不是感知，是【脱困动作】。
+          （此前偶发的高成功率来自底层随机指令重采样 bug 的隐式逃逸，见
+           viz_config.EVAL_COMMAND_RESAMPLING_TIME 注释。）
+        做法：检测"窗口内实际路程 < 阈值" -> 依次执行 倒退 -> 原地转 的标准四足脱困。
+        停滞窗口(30步=0.6s)必须短于环境自带的 TERM_STUCK_TIME_S(1.0s)，
+        否则环境先判失败、轮不到逃逸。
+        """
+        if not STALL_ESCAPE_ENABLE:
+            return False
+
+        # --- 1. 逃逸动作进行中：直接推进阶段计时，不再检测新停滞 ---
+        if self._stall_phase != "idle":
+            self._stall_phase_left -= 1
+            if self._stall_phase_left <= 0:
+                if self._stall_phase == "reverse":
+                    self._stall_phase = "turn"
+                    self._stall_phase_left = int(STALL_TURN_STEPS)
+                else:
+                    self._stall_phase = "idle"
+                    self._stall_travel_buf = []   # 逃逸后重新观察
+            return True
+
+        # --- 2. 检测停滞：维护滑动窗口内的实际路程 ---
+        buf = self._stall_travel_buf
+        buf.append(float(step_dist))
+        win = int(STALL_WINDOW_STEPS)
+        if len(buf) > win:
+            del buf[0:len(buf) - win]
+        if len(buf) < win:
+            return False
+        travel = float(sum(buf))
+        if travel >= float(STALL_MIN_TRAVEL_M):
+            return False
+
+        # --- 3. 确认停滞：触发逃逸 ---
+        if self._stall_escape_count >= int(STALL_MAX_ESCAPES):
+            return False        # 放弃逃逸，让环境按原逻辑判 timeout/卡住
+        self._stall_escape_count += 1
+        if STALL_TURN_ALTERNATE:
+            self._stall_turn_sign = -self._stall_turn_sign
+        self._stall_phase = "reverse"
+        self._stall_phase_left = int(STALL_REVERSE_STEPS)
+        if METRICS_PRINT_STATS:
+            print("🔁 检测到停滞(%.0f步内仅走 %.3fm)，触发逃逸 #%d：倒退%d步+转向%d步(方向%+.0f)"
+                  % (win, travel, self._stall_escape_count,
+                     int(STALL_REVERSE_STEPS), int(STALL_TURN_STEPS), self._stall_turn_sign))
+        return True
+
+    def _stall_escape_cmd(self):
+        """返回逃逸阶段的 (vx, wz)；倒退与原地转两段。"""
+        if self._stall_phase == "reverse":
+            return float(STALL_REVERSE_VX), 0.0
+        if self._stall_phase == "turn":
+            return 0.0, float(STALL_TURN_WZ) * float(self._stall_turn_sign)
+        return None
 
     def _set_trial_follow_camera(self):
         base_pos = self.env.root_states[0, 0:3].detach().cpu().numpy()
@@ -1059,6 +1454,13 @@ class Evaluator:
         torque_cost = np.array([s["torque_cost"] for s in self.state_log])
         energy = np.mean(torque_cost)
 
+        cmd_wz = np.array([s["cmd_wz"] for s in self.state_log], dtype=np.float64)
+        cmd_wz_variation = (float(np.mean(np.abs(np.diff(cmd_wz))))
+                            if cmd_wz.size > 1 else 0.0)
+        active_sign = np.sign(cmd_wz[np.abs(cmd_wz) > 0.05])
+        cmd_wz_sign_flips = (int(np.count_nonzero(np.diff(active_sign) != 0))
+                             if active_sign.size > 1 else 0)
+
         # 稳定性
         stab = self._compute_stability_errors()
 
@@ -1067,6 +1469,8 @@ class Evaluator:
             "orientation_error": stab["orientation_error"],
             "angular_vel_error": stab["angular_vel_error"],
             "energy": float(energy),
+            "cmd_wz_variation": cmd_wz_variation,
+            "cmd_wz_sign_flips": cmd_wz_sign_flips,
         }
 
     def _compute_stability_errors(self):
@@ -1082,29 +1486,10 @@ class Evaluator:
                 "angular_vel_error": 0.0,
             }
 
-        roll_list = []
-        pitch_list = []
-        wx_list = []
-        wy_list = []
-
-        for i in range(len(self.state_log)):
-            # 当前姿态
-            quat = self.env.base_quat[0]
-            roll, pitch, _ = self._quat_to_rpy(quat)
-
-            roll_list.append(roll)
-            pitch_list.append(pitch)
-
-            # 当前角速度
-            wx = self.env.base_ang_vel[0, 0].item()
-            wy = self.env.base_ang_vel[0, 1].item()
-            wx_list.append(wx)
-            wy_list.append(wy)
-
-        roll_arr = np.array(roll_list)
-        pitch_arr = np.array(pitch_list)
-        wx_arr = np.array(wx_list)
-        wy_arr = np.array(wy_list)
+        roll_arr = np.array([s["roll"] for s in self.state_log], dtype=np.float64)
+        pitch_arr = np.array([s["pitch"] for s in self.state_log], dtype=np.float64)
+        wx_arr = np.array([s["body_wx"] for s in self.state_log], dtype=np.float64)
+        wy_arr = np.array([s["body_wy"] for s in self.state_log], dtype=np.float64)
 
         orientation_error = np.mean(np.sqrt(roll_arr**2 + pitch_arr**2))
         angular_vel_error = np.mean(np.sqrt(wx_arr**2 + wy_arr**2))
@@ -1131,7 +1516,9 @@ class Evaluator:
             return
 
         os.makedirs(SAVE_CAMERA_IMAGE_DIR, exist_ok=True)
-        if SAVE_RGB_IMAGE:
+        # rgb is None => CAM_READ_RGB=False（省内存，只读 depth）；
+        # 配置正确时 SAVE_RGB_IMAGE=True 会自动把 CAM_READ_RGB 推导成 True。
+        if SAVE_RGB_IMAGE and rgb is not None:
             rgb_path = os.path.join(SAVE_CAMERA_IMAGE_DIR, f"rgb_{step:06d}.png")
             plt.imsave(rgb_path, rgb)
 
@@ -1141,6 +1528,9 @@ class Evaluator:
 
     def _show_camera_images(self, step, rgb, depth_pos):
         if not LIVE_SHOW_CAMERA_IMAGES or step % LIVE_CAMERA_IMAGE_INTERVAL != 0:
+            return
+        # 这个窗口要同屏显示 RGB+Depth，缺 RGB 就没意义（CAM_READ_RGB=False）
+        if rgb is None:
             return
 
         if self._camera_vis_fig is None:
@@ -1161,13 +1551,216 @@ class Evaluator:
         self._save_camera_images(step, rgb, depth_pos)
         self._show_camera_images(step, rgb, depth_pos)
                     
+    def _mask_occ_to_actors(self, occ_bev, base_pos, base_yaw):
+        """把障碍图限制在【actor 障碍】附近（白名单）。
+
+        为什么需要（2026-09-17 实测定位）：
+          BEV 的“同格高度差”判据不区分障碍来源。no_obstacles 场景（无任何石头）
+          里它仍稳定检出 ~55 个障碍格，世界坐标聚类全部落在 (8~13, 11) ——
+          即 terrain 四周那圈 4m 高【边界墙】（起点距左墙仅 2.4m，落在 BEV
+          横向 ±3m 内）。FMM 于是常年看见一堵左墙、持续往右推，观感上像
+          “在绕地形上的离散障碍”。地形凸起（hr≈0.01m）低于阈值、本就不会被检出。
+          用户语义：只绕【大石头 / 后续新增的动态障碍】这类 actor 障碍。
+        做法：actor 位置（env.all_root_states[1:num_actors_per_env]，含石头与树，
+          后续新增动态障碍只要建为 actor 即自动纳入）转到 BEV 格坐标，
+          按 BEV_ACTOR_MASK_RADIUS_M 画圆掩膜，障碍图与掩膜取交。
+        掩膜失败（拿不到 actor 状态）时原样返回，绝不中断导航。
+
+        ⚠ 2026-09-17 修复的真 bug：场景里【一个障碍 actor 都没有】时
+          （num_actors_per_env <= 1，如 no_obstacles 论文场景），本函数原先
+          `return occ_bev` —— 把含边界墙的原始障碍图原样放行，白名单形同虚设，
+          用户观察到的“绕地形上的离散障碍”因此始终存在。
+          正确语义是【没有任何 actor 障碍 => 障碍图全零】。
+        """
+        try:
+            n = int(getattr(self.env, "num_actors_per_env", 0) or 0)
+            states = getattr(self.env, "all_root_states", None)
+            if states is None:
+                return occ_bev          # 拿不到状态：降级为原行为，绝不中断导航
+            if n <= 1:
+                # 场景里没有任何障碍 actor：白名单的交集为空 => 全零障碍图
+                return np.zeros_like(occ_bev)
+            pos = states[1:n, :2].detach().cpu().numpy().astype(np.float64)
+            if pos.size == 0:
+                return np.zeros_like(occ_bev)
+            dx = pos[:, 0] - base_pos[0]
+            dy = pos[:, 1] - base_pos[1]
+            c = np.cos(-base_yaw); s_ = np.sin(-base_yaw)
+            xf = c * dx - s_ * dy        # 前向
+            yl = s_ * dx + c * dy        # 左侧
+            res = float(self.bev.bev_res)
+            H, W = occ_bev.shape
+            rr = (xf / res).astype(np.int64)
+            cc = (yl / res).astype(np.int64) + W // 2
+            rad = int(max(1, round(float(BEV_ACTOR_MASK_RADIUS_M) / res)))
+            mask = np.zeros((H, W), dtype=np.uint8)
+            for r0_, c0_ in zip(rr, cc):
+                lo_r, hi_r = max(0, r0_ - rad), min(H, r0_ + rad + 1)
+                lo_c, hi_c = max(0, c0_ - rad), min(W, c0_ + rad + 1)
+                if lo_r < hi_r and lo_c < hi_c:
+                    mask[lo_r:hi_r, lo_c:hi_c] = 1
+            return (occ_bev & mask).astype(np.uint8)
+        except Exception:
+            return occ_bev
+
+    def _forward_clearance(self, occ_bev):
+        """返回机器人正前方的净空距离 [m]，供速度调制使用。
+
+        上层原本只算 wz（转向），vx 恒为 NAV_FORWARD_VX，于是“看得见障碍却仍全速
+        撞上去”。这里补上缺失的距离感知。
+
+        两个数据源，取【更保守（更近）】的那个：
+          1) 像素级判据 BEVMapper.forward_obstacle_distance（主）
+             BEV 的“同格内高度差”判据对正对的垂直墙面天然失效：墙面上每个像素
+             深度几乎相同，反投影后落在同一格、高度也几乎相同，格内高度差≈0。
+             实测（走向 0.76m 高的大石头）：距石 1.76m 时锥内净空 0.55m，
+             但 1.10m 起近距障碍格归 0，净空【跳回最大值 3.00m】，
+             速度调制于是误判“前方无障”反而加速冲向石头 ——
+             感知失效被读成通路，这是最危险的失效方向。像素级判据没有这个盲区
+             （离线单测：墙在 0.3~3.0m 全部测准，误差 <0.05m）。
+          2) BEV 栅格锥扫（后备）
+             障碍图已由规划链路算好，顺手扫一遍锥内栅格。BEV 栅格已是机器人坐标系
+             （r = 前方 x，c = 左侧 y，机器人在 r=0, c=W//2），无需再做坐标变换。
+
+        返回 SPEED_MOD_MAX_RANGE 表示前方无碍（全速）。
+        """
+        best = float(SPEED_MOD_MAX_RANGE)
+
+        # --- 数据源 1：像素级（用最近一次读到的深度图）---
+        depth = getattr(self, "_last_depth_pos", None)
+        # ⚠ 默认关闭：该判据的地面模型用了 sin(θ)（斜距），而 IMAGE_DEPTH 是轴向深度、
+        #   应为 tan(θ)，实测在无障碍地形上误报 99%。见 viz_config.SPEED_MOD_USE_PIXEL_JUDGE。
+        if (SPEED_MOD_USE_PIXEL_JUDGE and depth is not None
+                and hasattr(self.bev, "forward_obstacle_distance")):
+            try:
+                dist_px, _hits = self.bev.forward_obstacle_distance(
+                    depth,
+                    half_angle_deg=SPEED_MOD_CONE_HALF_ANGLE,
+                    ground_ratio=SPEED_MOD_GROUND_RATIO,
+                    max_range=SPEED_MOD_MAX_RANGE,
+                    # ROI 与 BEV 建图解耦：BEV 用 0.55（只看地面，避免把地形起伏
+                    # 误判成障碍，实测论文场景 0.55 -> 0.90 而 0.10 -> 0.70），
+                    # 但刹车判据必须能看见高出相机的直立物，所以用更宽的 0.10。
+                    v_start_ratio=SPEED_MOD_ROI_START,
+                    min_fwd=SPEED_MOD_PIXEL_MIN_FWD)
+                best = min(best, float(dist_px))
+            except Exception:
+                pass    # 感知降级不该中断导航，下面的 BEV 锥扫仍兜底
+
+        # --- 数据源 2：BEV 栅格锥扫 ---
+        if occ_bev is None or not np.any(occ_bev):
+            return best
+
+        H, W = occ_bev.shape
+        res = float(self.bev.bev_res)
+        max_cells = int(min(H - 1, SPEED_MOD_MAX_RANGE / res))
+        if max_cells < 1:
+            return best
+
+        c0 = W // 2
+        # 逐行(前向距离)检查该距离上的锥内是否有障碍，取最近的障碍距离。
+        # 锥宽 = r * tan(半角)，离得越远横向容忍越大。
+        # ⚠ 半角必须先转成弧度再取 tan：原实现是 int(ceil(deg*pi/180))，
+        #   既取整又当弧度用（25° -> ceil(0.436) = 0 -> tan(0) = 0），
+        #   锥宽恒为 0，等于只扫机器人正前方那一列，侧向障碍全部漏掉。
+        tan_half = float(np.tan(np.deg2rad(SPEED_MOD_CONE_HALF_ANGLE)))
+        for r in range(1, max_cells + 1):
+            half_w = int(np.floor(r * tan_half))
+            c_lo = max(0, c0 - half_w)
+            c_hi = min(W - 1, c0 + half_w)
+            if c_lo <= c_hi and occ_bev[r, c_lo:c_hi + 1].any():
+                return min(best, float(r * res))
+        return best
+
+    def _couple_vx_wz(self, target_vx, wz, clearance=None):
+        """速度-转向耦合：急转时压低前进速度目标值。
+
+        为什么需要（2026-09-16 wz 日志实测定位）：
+          FMM 把机器狗当【全向点机器人】：wz=-1.0 + vx=1.0 时它认为“在原地左转”。
+          但盲走底层是差速近似：转弯半径 = vx/wz = 1.0m，实际轨迹是半径 1m 的圆弧，
+          圆弧弯向障碍一侧 -> 顶着石头楔死（指令 0.61 实际 0.011，clearance=3.0
+          无障却动不了）。急转时把 vx 压到 0.3，转弯半径缩到 0.3m，
+          机器狗才能真正“转得动”而不是画大圆弧撞上去。
+        作用于【限幅前的目标值】，加速度限幅仍由 _modulate_vx 统一施加。
+        """
+        if not SPEED_TURN_COUPLING_ENABLE:
+            return target_vx
+        # 启用条件（2026-09-17 四组实测定标，各 10 trial）：
+        #   · clearance < SPEED_TURN_CLEARANCE_M：耦合【默认唯一生效档】。绕障碍的
+        #     中速转降速，防止 1m 转弯圆弧顶住石头。实测 no_obstacles 0.90、
+        #     stones_only 0.80。
+        #   · SPEED_TURN_HARD_ENABLE=True 时额外启用「急转档」：|wz| >=
+        #     SPEED_TURN_WZ_HARD 不看 clearance 直接耦合。**默认关**，实测净负收益：
+        #     no_obstacles 0.90->0.00~0.10、stones_only 0.80->0.00。失效机理是航点
+        #     转角处 |wz| 达 0.7~1.0，vx 被压到 0.3 后盲走底层在粗糙坡失去前进动量
+        #     （指令 0.8~1.0、实际 0.000）判"卡住"。
+        #   · 其余（开阔地中缓转）：不耦合。无条件全耦合同样会让底层在粗糙地面
+        #     失去动量顶死（stones_only 0.60、I 组 0.00）。
+        a0 = abs(float(wz))
+        hard = bool(SPEED_TURN_HARD_ENABLE) and a0 >= float(SPEED_TURN_WZ_HARD)
+        near = (clearance is not None and SPEED_TURN_CLEARANCE_M > 0
+                and float(clearance) < float(SPEED_TURN_CLEARANCE_M))
+        if not (hard or near):
+            return target_vx
+        a = min(abs(float(wz)), float(SPEED_TURN_WZ_HI))
+        lo, hi = float(SPEED_TURN_WZ_LO), float(SPEED_TURN_WZ_HI)
+        if a <= lo:
+            return target_vx
+        if a >= hi:
+            return min(target_vx, float(SPEED_TURN_MIN_VX))
+        r = (a - lo) / max(hi - lo, 1e-9)
+        return target_vx + r * (float(SPEED_TURN_MIN_VX) - target_vx)
+
+    def _modulate_vx(self, clearance, dt, wz=0.0, goal_distance=None,
+                     speed_cap=None):
+        """按前向净空距离把 vx 从 NAV_FORWARD_VX 梯形降到 SPEED_MOD_MIN_VX。
+
+        带加速度限幅（SPEED_MOD_MAX_ACC），避免 vx 阶跃把盲走底层踢失稳 ——
+        底层是按平滑速度指令训练的，突变的 cmd_vx 本身就可能导致摔倒。
+        """
+        lo, hi = float(SPEED_MOD_STOP_DIST), float(SPEED_MOD_SLOW_DIST)
+        if not SPEED_MOD_ENABLE or clearance >= hi:
+            target = float(NAV_FORWARD_VX)
+        elif clearance <= lo:
+            target = float(SPEED_MOD_MIN_VX)
+        else:
+            ratio = (clearance - lo) / (hi - lo)
+            target = float(SPEED_MOD_MIN_VX
+                           + ratio * (NAV_FORWARD_VX - SPEED_MOD_MIN_VX))
+        # 最终目标接近速度：与障碍调速取更保守值，但到达判定仍是独立的欧氏距离。
+        if goal_distance is not None and NAV_GOAL_SLOW_DIST_M > NAV_GOAL_REACH_THRESH_M:
+            distance = float(goal_distance)
+            if distance < float(NAV_GOAL_SLOW_DIST_M):
+                ratio = np.clip(
+                    (distance - NAV_GOAL_REACH_THRESH_M)
+                    / (NAV_GOAL_SLOW_DIST_M - NAV_GOAL_REACH_THRESH_M),
+                    0.0, 1.0)
+                goal_target = (NAV_GOAL_APPROACH_MIN_VX
+                               + ratio * (NAV_FORWARD_VX - NAV_GOAL_APPROACH_MIN_VX))
+                target = min(target, float(goal_target))
+        if speed_cap is not None:
+            target = min(target, float(speed_cap))
+        # 加速度限幅
+        max_delta = float(SPEED_MOD_MAX_ACC) * max(dt, 1e-6)
+        cur = self._last_cmd_vx
+        limited = float(np.clip(target, cur - max_delta, cur + max_delta))
+        # 速度-转向耦合：急转目标降速（见 _couple_vx_wz），再统一限幅
+        limited = self._couple_vx_wz(limited, wz, clearance)
+        # 下限保护：绝不低于 MIN_VX（也不允许负速，避免倒退）
+        speed_floor = min(SPEED_MOD_MIN_VX, NAV_FORWARD_VX)
+        if goal_distance is not None:
+            speed_floor = min(speed_floor, NAV_GOAL_APPROACH_MIN_VX)
+        limited = float(max(limited, speed_floor))
+        self._last_cmd_vx = limited
+        return limited
+
     def _update_camera_and_bev(self, step):
 
         # 无相机（headless 跑 train、或 cam 创建失败）时直接跳过，
         # 否则下面 set_camera_location(None, ...) 会报错。
         # 与 _capture_fixed_overhead_image 的守卫保持一致。
         if self.env.cam_handle is None or self.env.camera_depth_tensor is None:
-            return
+            return False
 
         # === 相机跟随 ===
         base_pos = self.env.root_states[0, 0:3].cpu().numpy()
@@ -1182,10 +1775,15 @@ class Evaluator:
             base_pos[2] + CAM_FOLLOW_HEIGHT
         )
 
+        # 光轴俯角（向下为正）：把注视点沿光轴方向下压 look*tan(pitch)。
+        # 目的：平视时近距直立障碍（石头顶只比相机高 0.138m）落在 ROI 上沿之外，
+        # 1.1m 内必然漏检（几何下界，换判据无解）；下压光轴可把盲区下界推近。
+        # 见 viz_config.BEV_CAM_PITCH_DEG 的实测记录。
+        pitch = float(np.deg2rad(BEV_CAM_PITCH_DEG))
         cam_target = gymapi.Vec3(
             base_pos[0] + CAM_FOLLOW_LOOKAT_FORWARD * fx,
             base_pos[1] + CAM_FOLLOW_LOOKAT_FORWARD * fy,
-            base_pos[2] + CAM_FOLLOW_HEIGHT
+            base_pos[2] + CAM_FOLLOW_HEIGHT - CAM_FOLLOW_LOOKAT_FORWARD * np.tan(pitch)
         )
 
         self.env.gym.set_camera_location(
@@ -1200,7 +1798,13 @@ class Evaluator:
         # 只有 BEV_ENABLE_UPDATE / 存图 / 实时窗口 才真正需要深度数据，
         # 见 viz_config.CAM_READ_ENABLE 的说明；check_consistency 会提示误配。
         if not CAM_READ_ENABLE:
-            return
+            return False
+        # 感知降频：主循环 50Hz，而 BEV 栅格 5cm、机器狗 1.0m/s，每步只挪 0.4 格，
+        # 每步重建障碍图是严重过采样。间隔内直接复用上一次的 BEV（min_z/max_z 不变），
+        # 渲染拷贝与反投影开销同步降到 1/N。开关见 viz_config.PERCEPT_UPDATE_INTERVAL。
+        interval = PERCEPT_UPDATE_INTERVAL if PERCEPT_UPDATE_INTERVAL else 1
+        if interval > 1 and step % int(interval) != 0:
+            return False
         # ⚠ 关键：IsaacGym 要求先 step_graphics 同步相机位姿，再 render_all_camera_sensors，
         #   否则拿到的是上一帧的陈旧深度图。原本这一步是靠 env.step() 里的
         #   env.render() 顺带做的，而 render() 只在 enable_viewer_sync=True 时才调
@@ -1214,14 +1818,22 @@ class Evaluator:
         self.env.gym.render_all_camera_sensors(self.env.sim)
         self.env.gym.start_access_image_tensors(self.env.sim)
         depth = self.env.camera_depth_tensor.detach().cpu().numpy()
-        rgb   = self.env.camera_color_tensor.detach().cpu().numpy()
+        # RGB 只在真要存图/显示时才拷回来。避障链路只需要 depth，
+        # 原代码每步无条件多拷一张 float32（320x180 = 0.23MB），泄漏量直接翻倍。
+        # 消费方判定见 viz_config.CAM_READ_RGB / cam_rgb_consumers()。
+        rgb = None
+        if CAM_READ_RGB:
+            rgb = self.env.camera_color_tensor.detach().cpu().numpy()
         self.env.gym.end_access_image_tensors(self.env.sim)
 
         depth = np.nan_to_num(depth, 0.0)
         # 裁剪上限与 BEV_MAX_DEPTH 一致（BEV 建图也按同一上限过滤无效深度）
         depth_pos = np.clip(-depth, 0.0, BEV_MAX_DEPTH)
-        rgb = rgb[..., :3]
-        rgb = rgb.astype(np.uint8)
+        # 缓存给像素级前向净空判据用（BEVMapper.forward_obstacle_distance）。
+        # 感知降频时中间步不重新渲染，沿用这张即可 —— 与 BEV 障碍图的复用节奏一致。
+        self._last_depth_pos = depth_pos
+        if rgb is not None:
+            rgb = rgb[..., :3].astype(np.uint8)
 
         # === BEV Height Map ===
         # 开关见 viz_config.BEV_ENABLE_UPDATE。
@@ -1229,11 +1841,19 @@ class Evaluator:
         #   默认仍保持原行为；改成 True 才会真正把深度图喂进 BEV 建图。
         if BEV_ENABLE_UPDATE:
             self.bev.update(depth_pos)
+        # rgb=None 表示本轮没拷 RGB（CAM_READ_RGB=False）。depth 存图仍要照常执行，
+        # 只有依赖 RGB 的那两个分支各自跳过（见 _save_camera_images / _show_camera_images）。
         self._handle_camera_images(step, rgb, depth_pos)
+        return True
 
     def run(self, num_trials):
         success = 0
         success_times = []
+        if SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL and int(num_trials) > 1:
+            print("[场景提示] GPU PhysX 静态障碍在进程创建时固化；本进程的 %d 个 trial "
+                  "共用 seed=%d 的障碍布局。需要逐轮随机时，请每轮用不同的 "
+                  "HIMLOCO_SCENE_SEED 重新启动进程。"
+                  % (int(num_trials), int(SCENE_RANDOM_SEED_BASE)))
         if LIVE_SHOW_CAMERA_IMAGES or LIVE_SHOW_BEV_FMM_WINDOW:
             plt.ion()
         for i in range(num_trials):
@@ -1280,6 +1900,9 @@ class Evaluator:
         print(f"Avg Torque Cost      : {metrics['energy']:.3f}")
         print(f"Orientation Error     : {metrics['orientation_error']:.3f} rad")
         print(f"Angular Vel Error     : {metrics['angular_vel_error']:.3f} rad/s")
+        print(f"Command Wz Variation  : {metrics['cmd_wz_variation']:.4f} rad/s/step")
+        print(f"Command Wz Sign Flips : {metrics['cmd_wz_sign_flips']}")
+        self._print_narrow_passage_stats()
         return False, elapsed_time
     
     def _handle_success(self, elapsed_time):
@@ -1292,7 +1915,19 @@ class Evaluator:
         print(f"Avg Torque Cost      : {metrics['energy']:.3f}")
         print(f"Orientation Error     : {metrics['orientation_error']:.3f} rad")
         print(f"Angular Vel Error     : {metrics['angular_vel_error']:.3f} rad/s")
+        print(f"Command Wz Variation  : {metrics['cmd_wz_variation']:.4f} rad/s/step")
+        print(f"Command Wz Sign Flips : {metrics['cmd_wz_sign_flips']}")
+        self._print_narrow_passage_stats()
         return True, elapsed_time
+
+    def _print_narrow_passage_stats(self):
+        clearance = self.trial_min_path_clearance
+        clearance_text = "n/a" if not np.isfinite(clearance) else "%.3f m" % clearance
+        print("Narrow Passage       : %d steps, min path clearance %s"
+              % (self.trial_narrow_steps, clearance_text))
+        if self._use_temporal_memory:
+            print("Temporal Memory      : max %d world voxels"
+                  % self.trial_memory_max_points)
 
 
     def _get_base_yaw(self, env_id=0):
