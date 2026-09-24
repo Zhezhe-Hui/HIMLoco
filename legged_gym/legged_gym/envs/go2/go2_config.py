@@ -120,7 +120,8 @@ class Go2RoughCfg( LeggedRobotCfg ):
         mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
         horizontal_scale = 0.10 # [m] 小砖块地形需要更细的 heightfield 分辨率
         vertical_scale = 0.005 # [m]
-        border_size = 0 # [m]
+        border_size = VIZ.TERRAIN_BORDER_SIZE_M # [m]，把外墙移出局部视觉范围
+        border_ground_height_m = VIZ.TERRAIN_BORDER_GROUND_HEIGHT_M
         curriculum = False
         static_friction = 1.0
         dynamic_friction = 1.0

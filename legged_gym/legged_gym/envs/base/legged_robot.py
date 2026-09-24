@@ -1482,6 +1482,10 @@ class LeggedRobot(BaseTask):
                 # 静态石头不会自由落体，直接贴地放置；动态时仍从 h_offset 抛下
                 small_z_offset = float(self._stone_cfg_get("small_static_z_offset", 0.01)
                                        if small_static else h_offset)
+                # Bind rubble generation to the scene seed. Otherwise paired
+                # planner runs would silently receive different small stones.
+                small_seed = int(self._stone_cfg_get("random_seed", 0)) + 200000 + i
+                small_rng = np.random.RandomState(small_seed)
 
                 # --- 1) 固定大石头（静态、带贴图）：actor 索引 1..num_big ---
                 #     保持“大石头在前、小碎石在后”的既有 actor 顺序，
@@ -1502,15 +1506,15 @@ class LeggedRobot(BaseTask):
                 # --- 2) 随机小碎石：actor 索引 num_big+1..num_stones ---
                 for s in range(num_small_stones):
                     actor_id = num_big_stones + s
-                    rx = np.random.uniform(spawn_x_min, spawn_x_max)
-                    ry = np.random.uniform(spawn_y_min, spawn_y_max)
+                    rx = small_rng.uniform(spawn_x_min, spawn_x_max)
+                    ry = small_rng.uniform(spawn_y_min, spawn_y_max)
                     scale = self._quantize_stone_scale(
-                        np.random.uniform(s_min, s_max), "small")
+                        small_rng.uniform(s_min, s_max), "small")
                     terrain_z = self._get_terrain_height_at(rx, ry)
                     z_height = terrain_z + small_z_offset
                     stone_pose = gymapi.Transform()
                     stone_pose.p = gymapi.Vec3(rx, ry, z_height)
-                    rand = np.random.randn(4)
+                    rand = small_rng.randn(4)
                     rand /= np.linalg.norm(rand)
                     stone_pose.r = gymapi.Quat(rand[0], rand[1], rand[2], rand[3])
                     stone_handle = self.gym.create_actor(

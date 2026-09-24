@@ -5,9 +5,9 @@ go2 可视化与输出统一配置
 把 play.py / play1.py / pathplanner.py 里散落的所有开关集中到这一个文件。
 改开关只需编辑本文件，不必再去动 play.py 或 pathplanner.py。
 
-【手动运行命令】以下命令均从仓库根目录执行，可直接复制到终端。
+【手动运行命令】以下命令均从 legged_gym 工作目录执行，可直接复制到终端。
 
-    cd /home/fabu/HIMLoco
+    cd /home/fabu/HIMLoco/legged_gym
     conda activate himloco
     export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
 
@@ -42,17 +42,30 @@ go2 可视化与输出统一配置
     HIMLOCO_PRESET=nav_only          # 关闭 viewer，适合批量实验；仍不要加 --headless
     HIMLOCO_PRESET=paper             # 保存轨迹、统计结果及论文图片
     HIMLOCO_SCENE_PRESET=narrow_gate # 固定双石窄门，检查对准和侧擦
-    HIMLOCO_SCENE_PRESET=random_corridor  # 随机大石头、树和离散高度地形
+    HIMLOCO_SCENE_PRESET=random_corridor_easy    # 简单：10大石+2树+100小碎石
+    HIMLOCO_SCENE_PRESET=random_corridor_medium  # 中等：15大石+3树+200小碎石
+    HIMLOCO_SCENE_PRESET=random_corridor_hard    # 困难：20大石+4树+400小碎石
     HIMLOCO_SCENE_PRESET=blocker     # 固定挡路障碍，用于基础避障回归
     HIMLOCO_SCENE_PRESET=empty       # 平地且无障碍，仅检查步态/控制
     HIMLOCO_PLANNER_MODE=mppi        # MPPI 局部规划器（当前推荐）
     HIMLOCO_PLANNER_MODE=fmm         # FMM 基线，用于 A/B 对照
     HIMLOCO_NUM_TRIALS=10            # 本进程实验次数；肉眼查看建议设为 1
     HIMLOCO_SCENE_SEED=20260922      # 随机种子；A/B 对照必须保持一致
-    HIMLOCO_TEMPORAL_MEMORY=1        # 1 开启时序障碍记忆，0 关闭做消融
+    HIMLOCO_TEMPORAL_MEMORY=0        # 默认关闭；1 仅用于已否决的记忆负消融
+    HIMLOCO_VIO_NOISE=ideal          # ideal/mild/medium/severe，仿真VIO误差档位
     HIMLOCO_MPPI_SAMPLES=384         # MPPI 采样数；增大更慢，通常也更稳定
     HIMLOCO_FMM_SOFT_COST=1          # FMM 使用连续安全代价；0 为硬膨胀基线
     HIMLOCO_DEBUG_START_STEPS=30     # 输出起步阶段调试日志；0 表示关闭
+    HIMLOCO_ACTOR_WHITELIST=1        # 仅诊断；使用actor真值，论文实验严禁开启
+
+【侧向盲区记忆消融】同一场景分别运行：
+    HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=side_blind_turn HIMLOCO_PLANNER_MODE=mppi HIMLOCO_TEMPORAL_MEMORY=0 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
+    HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=side_blind_turn HIMLOCO_PLANNER_MODE=mppi HIMLOCO_TEMPORAL_MEMORY=1 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
+
+【30个固定seed批量实验】每个seed独立进程，避免静态碰撞体无法重排：
+    python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_easy --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
+    python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_medium --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
+    python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_hard --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
 
     # 单行写法示例（效果与多行命令相同）：
     HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=narrow_gate HIMLOCO_PLANNER_MODE=mppi HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
@@ -75,6 +88,7 @@ go2 可视化与输出统一配置
 因此这里的名字就是原来那些模块级常量，行为完全兼容。
 """
 
+import math
 import os
 
 from legged_gym import LEGGED_GYM_ROOT_DIR
@@ -504,6 +518,8 @@ NUM_ENVS = 1
 #:   HIMLOCO_NUM_TRIALS=3 python play1.py --task=go2
 #: 注意：本项目在 --headless 下不创建深度相机，视觉导航实验不能添加该参数。
 NUM_TRIALS = int(os.environ.get("HIMLOCO_NUM_TRIALS", "10"))
+#: 单进程结构化结果输出。批量脚本为每个 seed 指定独立 JSON 文件。
+RESULT_JSON_PATH = os.environ.get("HIMLOCO_RESULT_JSON", "").strip()
 NAV_EPISODE_LENGTH_S = 60.0  #: 24m 随机走廊含绕障，30~45s 容易把正常绕行误判超时
 RENDER = True           #: 是否开 IsaacGym viewer 窗口
 PLANNER_MODE = os.environ.get("HIMLOCO_PLANNER_MODE", "mppi").strip().lower()
@@ -660,6 +676,8 @@ SCENE_RANDOM_OBSTACLE_Y = (0.0, 12.0)
 SCENE_RANDOM_OBSTACLE_MIN_SEPARATION_M = 1.65
 SCENE_RANDOM_TREE_Z_OFFSET = 0.02
 SCENE_RANDOM_CORRIDOR_BIG_STONE_COUNT = 20
+#: 三档论文场景使用固定的树种顺序；难度只增加数量，不替换已有树种。
+SCENE_DIFFICULTY_TREE_NAMES = ("deadwood", "oak_tree", "snow_tree", "sno_tree")
 #: 可用 HIMLOCO_SCENE_SEED 覆盖；相同 seed 可让不同算法复用完全相同的布局。
 SCENE_RANDOM_SEED_BASE = _env_int("HIMLOCO_SCENE_SEED", 20260922)
 
@@ -731,6 +749,10 @@ TERRAIN_ROUGH_DOWNSAMPLE = 0.2
 #: 离散障碍高度的 difficulty 换算
 TERRAIN_DISCRETE_OBSTACLE_BASE = 0.05
 TERRAIN_DISCRETE_OBSTACLE_SCALE = 0.1
+#: 地形主体四周的平坦缓冲带。路线仍使用原世界坐标，缓冲带把仿真边界墙移到
+#: 相机/局部 BEV 之外，避免依赖 actor 真值白名单过滤墙体。
+TERRAIN_BORDER_SIZE_M = 6.0
+TERRAIN_BORDER_GROUND_HEIGHT_M = 0.0
 #: 地形边界墙（防止机器人跑出地图）
 TERRAIN_WALL_ENABLE = True
 TERRAIN_WALL_THICKNESS_M = 1.0
@@ -777,6 +799,11 @@ SCENE_BLOCKER_TWO_POSITIONS = [
 # 碰撞几何之间净缝约 0.74m，缝中心严格位于 y=6.0。
 SCENE_NARROW_GATE_POSITIONS = [
     (16.0, 4.6905), (16.0, 6.3905),
+]
+# 侧向盲区：机器人沿 +x 从石头右侧经过，随后在石头前方左转。
+# 转弯时石头会离开前视相机，但仍落在机身旋转包络附近。
+SCENE_SIDE_BLIND_TURN_POSITIONS = [
+    (14.20, 6.65),
 ]
 SCENE_BLOCKER_STONE_POSITIONS = [
     (8.0, 8.6), (9.5, 8.3),      # seg0→1
@@ -853,6 +880,18 @@ SCENE_PRESETS = {
         SPAWN_RANDOM_X_RANGE=(6.0, 6.0),
         SPAWN_RANDOM_Y_RANGE=(6.0, 6.0),
     ),
+    # 时序记忆专用消融：同一 seed 分别以 HIMLOCO_TEMPORAL_MEMORY=0/1 运行。
+    "side_blind_turn": dict(
+        SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
+        SCENE_NUM_SMALL_STONES=0, SCENE_ENABLE_TREES=False,
+        SCENE_TERRAIN_PRESET="flat", SCENE_STONE_LAYOUT="side_blind_turn",
+        SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=False,
+        NAV_RANDOM_STRAIGHT_ROUTE=False,
+        WAYPOINTS=[(14.80, 6.00), (14.80, 11.00)],
+        SPAWN_RANDOMIZE_EACH_TRIAL=True,
+        SPAWN_RANDOM_X_RANGE=(6.0, 6.0),
+        SPAWN_RANDOM_Y_RANGE=(6.0, 6.0),
+    ),
     # 同上但保留树（更接近野外，代价是构建变慢、显存变高）
     "blocker_trees": dict(
         SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
@@ -866,6 +905,58 @@ SCENE_PRESETS = {
         SCENE_NUM_SMALL_STONES=0, SCENE_ENABLE_TREES=True,
         SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT="random_corridor",
         SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
+        NAV_RANDOM_STRAIGHT_ROUTE=True,
+        SPAWN_RANDOMIZE_EACH_TRIAL=True,
+    ),
+    # 第三章统一难度梯度：地形、路线、障碍分布区域和规划参数完全一致，
+    # 只递增大石头、树和可踩踏小碎石数量。
+    "random_corridor_easy": dict(
+        SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
+        SCENE_RANDOM_CORRIDOR_BIG_STONE_COUNT=10, SCENE_NUM_SMALL_STONES=100,
+        SCENE_ENABLE_TREES=True,
+        SCENE_TREE_WHITELIST=list(SCENE_DIFFICULTY_TREE_NAMES[:2]),
+        SCENE_STONE_SPAWN_X=(12.0, 24.0), SCENE_STONE_SPAWN_Y=(0.0, 12.0),
+        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT="random_corridor",
+        SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
+        NAV_RANDOM_STRAIGHT_ROUTE=True, SPAWN_RANDOMIZE_EACH_TRIAL=True,
+    ),
+    "random_corridor_medium": dict(
+        SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
+        SCENE_RANDOM_CORRIDOR_BIG_STONE_COUNT=15, SCENE_NUM_SMALL_STONES=200,
+        SCENE_ENABLE_TREES=True,
+        SCENE_TREE_WHITELIST=list(SCENE_DIFFICULTY_TREE_NAMES[:3]),
+        SCENE_STONE_SPAWN_X=(12.0, 24.0), SCENE_STONE_SPAWN_Y=(0.0, 12.0),
+        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT="random_corridor",
+        SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
+        NAV_RANDOM_STRAIGHT_ROUTE=True, SPAWN_RANDOMIZE_EACH_TRIAL=True,
+    ),
+    "random_corridor_hard": dict(
+        SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
+        SCENE_RANDOM_CORRIDOR_BIG_STONE_COUNT=20, SCENE_NUM_SMALL_STONES=400,
+        SCENE_ENABLE_TREES=True,
+        SCENE_TREE_WHITELIST=list(SCENE_DIFFICULTY_TREE_NAMES),
+        SCENE_STONE_SPAWN_X=(12.0, 24.0), SCENE_STONE_SPAWN_Y=(0.0, 12.0),
+        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT="random_corridor",
+        SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
+        NAV_RANDOM_STRAIGHT_ROUTE=True, SPAWN_RANDOMIZE_EACH_TRIAL=True,
+    ),
+    # 第三章规划器消融：随机石头、树和路线不变，只移除会导致底层步态
+    # 独立卡滞的离散高度。粗糙地形与规划器组合留到第五章系统实验。
+    "random_corridor_flat": dict(
+        SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
+        SCENE_NUM_SMALL_STONES=0, SCENE_ENABLE_TREES=True,
+        SCENE_TERRAIN_PRESET="flat", SCENE_STONE_LAYOUT="random_corridor",
+        SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
+        NAV_RANDOM_STRAIGHT_ROUTE=True,
+        SPAWN_RANDOMIZE_EACH_TRIAL=True,
+    ),
+    # 第五章失败归因对照：同样的离散高度、随机出生点和24m直线路线，
+    # 但不放石头/树。若这里也失败，应归为底层运动/地形失败而非规划失败。
+    "random_corridor_terrain_only": dict(
+        SCENE_ENABLE_STONES=False, SCENE_ENABLE_BIG_STONES=False,
+        SCENE_NUM_SMALL_STONES=0, SCENE_ENABLE_TREES=False,
+        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT=None,
+        SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=False,
         NAV_RANDOM_STRAIGHT_ROUTE=True,
         SPAWN_RANDOMIZE_EACH_TRIAL=True,
     ),
@@ -994,6 +1085,8 @@ def resolve_stone_layout(layout=None):
         return list(SCENE_BLOCKER_TWO_POSITIONS)
     if layout == "narrow_gate":
         return list(SCENE_NARROW_GATE_POSITIONS)
+    if layout == "side_blind_turn":
+        return list(SCENE_SIDE_BLIND_TURN_POSITIONS)
     if layout == "random_corridor":
         # 这里只提供 actor 数量；legged_robot 在 PhysX actor 创建前按 seed 重新采样。
         # GPU pipeline 启动后不能移动静态碰撞体，因此同一进程内布局保持不变。
@@ -1065,6 +1158,14 @@ def check_consistency(verbose=True):
         problems.append("MPPI 机身足迹长宽必须 > 0")
     if TEMPORAL_MEMORY_MAX_AGE_STEPS < 1:
         problems.append("TEMPORAL_MEMORY_MAX_AGE_STEPS 必须 >= 1")
+    if VIO_LATENCY_STEPS < 0:
+        problems.append("VIO_LATENCY_STEPS 必须 >= 0")
+    if not 0.0 <= VIO_DROPOUT_PROBABILITY < 1.0:
+        problems.append("VIO_DROPOUT_PROBABILITY 必须位于 [0, 1)")
+    if BEV_OBSTACLE_ACTORS_ONLY:
+        notes.append(
+            "HIMLOCO_ACTOR_WHITELIST=1：规划器正在使用仿真 actor 真值；"
+            "该模式仅供诊断，不得用于论文实验")
     if abs(CAM_HORIZONTAL_FOV - BEV_HFOV_DEG) > 1e-6:
         problems.append(
             "CAM_HORIZONTAL_FOV(%s) 必须等于 BEV_HFOV_DEG(%s)，否则深度图反投影到 BEV 会错位"
@@ -1508,8 +1609,9 @@ BEV_ENABLE_UPDATE = True
 #:   ⚠ 2026-09-17 实测：BEV 判据不区分来源，no_obstacles 场景里仍稳定检出 ~55 格，
 #:     世界坐标聚类全在 terrain 边界墙（4m 高，起点距左墙 2.4m，在 BEV ±3m 内），
 #:     FMM 常年往右推，观感像“在绕地形离散障碍”。地形凸起 hr≈0.01m 本就不会被检出。
-#:   True = 只绕 actor（用户语义）；False = 原行为（墙/地形起伏也进障碍图）。
-BEV_OBSTACLE_ACTORS_ONLY = True
+#:   正式实验必须为 False：actor 位姿是仿真真值，只能用于离线评价，不能进入规划器。
+#:   HIMLOCO_ACTOR_WHITELIST=1 仅供定位深度感知问题，使用该开关的数据不得写入论文结果。
+BEV_OBSTACLE_ACTORS_ONLY = _env_bool("HIMLOCO_ACTOR_WHITELIST", False)
 #: 每个 actor 的掩膜半径 [m]。大石头 scale=2 实测 footprint 约 1.0~1.2m 宽，
 #:   取 0.8 留膨胀余量；太小会漏掉石头边缘、太大会把窄廊堵死。
 BEV_ACTOR_MASK_RADIUS_M = 0.8
@@ -1542,13 +1644,41 @@ BEV_CLEARANCE_USE_RAW_MAP = True
 BEV_ENABLE_MEMORY_FUSION = False
 BEV_MEMORY_MAX_AGE = 30         #: 记忆寿命 [帧]，约 1 秒（dt≈0.03）
 
-# ---------- 世界坐标时序障碍记忆（MPPI方法）----------
+# ---------- 世界坐标时序障碍记忆（仅保留作负消融）----------
 #: 与上面的旧机器人坐标栅格记忆不同，本模块保存世界坐标障碍点，并按当前完整
 #: SE(2) 位姿重投影；因此原地转向不会把同一障碍重复涂满局部地图。
-TEMPORAL_MEMORY_ENABLE = _env_bool("HIMLOCO_TEMPORAL_MEMORY", True)
+#: 5个配对训练seed中，开关两组均为3/5成功；记忆会救回一个困难seed，也会让另一个
+#: 原本成功的seed保守卡死，且成功样本平均更慢。因此不作为默认方法或论文贡献。
+TEMPORAL_MEMORY_ENABLE = _env_bool("HIMLOCO_TEMPORAL_MEMORY", False)
 TEMPORAL_MEMORY_MAX_AGE_STEPS = 50    #: 50 Hz 下保留 1 秒，覆盖转身盲区且限制边缘累积
 TEMPORAL_MEMORY_VOXEL_M = 0.10
 TEMPORAL_MEMORY_MAX_POINTS = 12000
+
+# ---------- 仿真 VIO 位姿源 ----------
+#: ideal 使用仿真真值作为“理想 VIO”；其余档位只作用于上层建图、目标变换和规划。
+#: actor 真值、碰撞和最终物理误差仍只由评测器读取，不反馈给规划器。
+VIO_NOISE_PRESETS = {
+    "ideal":  (0.00, 0.0, 0.000, 0.0, 0, 0.00),
+    "mild":   (0.01, 0.5, 0.005, 0.1, 1, 0.00),
+    "medium": (0.03, 1.0, 0.015, 0.3, 2, 0.01),
+    "severe": (0.05, 2.0, 0.030, 0.6, 4, 0.05),
+}
+VIO_NOISE_LEVEL = os.environ.get("HIMLOCO_VIO_NOISE", "ideal").strip().lower()
+if VIO_NOISE_LEVEL not in VIO_NOISE_PRESETS:
+    raise ValueError("HIMLOCO_VIO_NOISE=%r 不受支持，可选 %s"
+                     % (VIO_NOISE_LEVEL, sorted(VIO_NOISE_PRESETS)))
+(_vio_pos_sigma, _vio_yaw_sigma_deg, _vio_pos_drift,
+ _vio_yaw_drift_deg, _vio_latency, _vio_dropout) = VIO_NOISE_PRESETS[VIO_NOISE_LEVEL]
+VIO_POSITION_SIGMA_M = _env_float("HIMLOCO_VIO_POS_SIGMA_M", _vio_pos_sigma)
+VIO_YAW_SIGMA_RAD = math.radians(_env_float(
+    "HIMLOCO_VIO_YAW_SIGMA_DEG", _vio_yaw_sigma_deg))
+VIO_POSITION_DRIFT_M_SQRT_S = _env_float(
+    "HIMLOCO_VIO_POS_DRIFT_M_SQRT_S", _vio_pos_drift)
+VIO_YAW_DRIFT_RAD_SQRT_S = math.radians(_env_float(
+    "HIMLOCO_VIO_YAW_DRIFT_DEG_SQRT_S", _vio_yaw_drift_deg))
+VIO_LATENCY_STEPS = _env_int("HIMLOCO_VIO_LATENCY_STEPS", _vio_latency)
+VIO_DROPOUT_PROBABILITY = _env_float("HIMLOCO_VIO_DROPOUT", _vio_dropout)
+VIO_RANDOM_SEED_OFFSET = 700000
 
 # ---------- FMM 梯度跟随（本文方法）----------
 FMM_MAX_WZ = 1.0                #: 角速度上限 [rad/s]
@@ -1705,11 +1835,14 @@ STALL_MIN_TRAVEL_M = 0.05       #: 窗口内路程低于该值算停滞 [m]
 #: 逃逸动作：先倒退，再原地转，各持续若干步。
 #:   倒退是四足脱困的标准手法（离开卡住脚的那个坑洼），
 #:   之后原地转把朝向换一个方向，避开刚才走不通的那条线。
-STALL_REVERSE_STEPS = 25        #: 倒退步数（0.5s）
+STALL_REVERSE_STEPS = 40        #: 倒退步数（0.8s），确保机身退出局部卡点/障碍包络
 STALL_REVERSE_VX = -0.4         #: 倒退速度 [m/s]（负值）
 STALL_TURN_STEPS = 35           #: 原地转向步数（0.7s）
-STALL_TURN_WZ = -0.9            #: 逃逸转向角速度 [rad/s]（符号由 STALL_TURN_ALTERNATE 决定）
+STALL_TURN_WZ = -0.9            #: 逃逸转向角速度 [rad/s]（实际符号由下方策略决定）
+#: 优先比较机器人左右近场的占据量，转向障碍更少的一侧；平局沿用规划器当前转向。
+STALL_TURN_USE_BEV = True
 #: 每次逃逸交替转向方向（True）还是固定方向（False）。交替可避免反复转回同一个死锁位。
+#: 仅在 STALL_TURN_USE_BEV=False 或没有可用 BEV 时作为回退策略。
 STALL_TURN_ALTERNATE = True
 #: 逃逸期间忽略 FMM 的 wz 与速度调制，直接用逃逸指令（必须如此，否则上层会把它拉回去）。
 STALL_OVERRIDE_PLANNER = True
@@ -2091,7 +2224,8 @@ def summary():
             STALL_WINDOW_STEPS, STALL_MIN_TRAVEL_M,
             STALL_REVERSE_STEPS, STALL_REVERSE_VX,
             STALL_TURN_STEPS, STALL_TURN_WZ,
-            ",交替方向" if STALL_TURN_ALTERNATE else ",固定方向",
+            (",BEV择空侧" if STALL_TURN_USE_BEV else
+             (",交替方向" if STALL_TURN_ALTERNATE else ",固定方向")),
             STALL_MAX_ESCAPES)
         if STALL_ESCAPE_ENABLE else "关")
     new_state = (
@@ -2106,6 +2240,10 @@ def summary():
             "开" if LIVE_FOLLOW_VIEWER_CAMERA else "关",
         )
     )
-    return "preset=%s | 已开启: %s\n%s\n相机读取: %s | %s\n%s\n%s" % (
+    vio_state = ("VIO=%s(σxy=%.3fm,σyaw=%.2fdeg,延迟%d步,丢帧%.1f%%)" % (
+        VIO_NOISE_LEVEL, VIO_POSITION_SIGMA_M,
+        math.degrees(VIO_YAW_SIGMA_RAD), VIO_LATENCY_STEPS,
+        100.0 * VIO_DROPOUT_PROBABILITY))
+    return "preset=%s | 已开启: %s\n%s\n相机读取: %s | %s\n%s\n%s | %s" % (
         ACTIVE_PRESET, ", ".join(on) if on else "无", scene_summary(),
-        cam_state, percept + " | " + planner_rate, nav_state, new_state)
+        cam_state, percept + " | " + planner_rate, nav_state, new_state, vio_state)

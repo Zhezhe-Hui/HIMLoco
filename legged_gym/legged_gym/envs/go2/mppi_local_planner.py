@@ -8,6 +8,25 @@ def _wrap_angle(angle):
     return (angle + np.pi) % (2.0 * np.pi) - np.pi
 
 
+def choose_safer_turn_sign(occ_local, preferred_wz=0.0):
+    """Choose +1 (left) or -1 (right) from near-field occupancy."""
+    occ = np.asarray(occ_local, dtype=np.uint8)
+    if occ.ndim != 2 or occ.size == 0:
+        return 1 if float(preferred_wz) >= 0.0 else -1
+    h, w = occ.shape
+    center = w // 2
+    near = occ[:max(1, h // 2)]
+    right_count = int(np.count_nonzero(near[:, :center]))
+    left_count = int(np.count_nonzero(near[:, center + 1:]))
+    if left_count < right_count:
+        return 1
+    if right_count < left_count:
+        return -1
+    if abs(float(preferred_wz)) > 1e-3:
+        return 1 if float(preferred_wz) > 0.0 else -1
+    return 1
+
+
 class WorldObstacleMemory:
     """Sparse world-aligned obstacle memory projected into the current BEV."""
 
@@ -30,10 +49,34 @@ class WorldObstacleMemory:
         return (int(np.round(x_w / self.voxel_size_m)),
                 int(np.round(y_w / self.voxel_size_m)))
 
-    def update(self, occ_local, pose_xy_yaw, step):
+    def update(self, occ_local, pose_xy_yaw, step, observed_local=None):
         occ = np.asarray(occ_local, dtype=np.uint8)
         if occ.shape != (self.H, self.W):
             raise ValueError("occ_local shape does not match memory BEV")
+
+        # Clear stale voxels only where the current depth frame explicitly observed
+        # free space. Cells outside the camera frustum remain unknown and keep memory.
+        if observed_local is not None and self._voxels:
+            observed = np.asarray(observed_local, dtype=bool)
+            if observed.shape != (self.H, self.W):
+                raise ValueError("observed_local shape does not match memory BEV")
+            free_observed = observed & (occ == 0)
+            keys = np.asarray(list(self._voxels.keys()), dtype=np.float64)
+            x_w = keys[:, 0] * self.voxel_size_m
+            y_w = keys[:, 1] * self.voxel_size_m
+            x, y, yaw = map(float, pose_xy_yaw)
+            cy, sy = math.cos(yaw), math.sin(yaw)
+            dx, dy = x_w - x, y_w - y
+            rows = np.floor((cy * dx + sy * dy) / self.bev_res).astype(np.int32)
+            cols = np.floor(
+                (-sy * dx + cy * dy) / self.bev_res + self.W * 0.5
+            ).astype(np.int32)
+            inside = ((rows >= 0) & (rows < self.H)
+                      & (cols >= 0) & (cols < self.W))
+            clear = np.zeros(keys.shape[0], dtype=bool)
+            clear[inside] = free_observed[rows[inside], cols[inside]]
+            for key in map(tuple, keys[clear].astype(np.int64)):
+                self._voxels.pop(key, None)
 
         rows, cols = np.nonzero(occ)
         if rows.size:

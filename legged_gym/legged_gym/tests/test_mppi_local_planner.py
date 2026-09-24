@@ -6,6 +6,7 @@ import numpy as np
 from legged_gym.envs.go2.mppi_local_planner import (
     FootprintMPPIController,
     WorldObstacleMemory,
+    choose_safer_turn_sign,
 )
 
 
@@ -39,6 +40,51 @@ class WorldObstacleMemoryTest(unittest.TestCase):
 
         memory.update(np.zeros_like(occ), (1.0, 0.0, 0.0), step=4)
         self.assertEqual(memory.point_count, 0)
+
+    def test_reobserved_free_space_clears_ghost_obstacle(self):
+        memory = WorldObstacleMemory(
+            bev_res=0.1, bev_x=6.0, bev_y=6.0,
+            max_age_steps=20, voxel_size_m=0.1)
+        occ = np.zeros((60, 60), dtype=np.uint8)
+        occ[20, 30] = 1
+        memory.update(occ, (0.0, 0.0, 0.0), step=0)
+
+        observed = np.zeros_like(occ, dtype=bool)
+        observed[20, 30] = True
+        memory.update(
+            np.zeros_like(occ), (0.0, 0.0, 0.0), step=1,
+            observed_local=observed)
+
+        self.assertEqual(memory.point_count, 0)
+
+    def test_unobserved_space_keeps_obstacle_memory(self):
+        memory = WorldObstacleMemory(
+            bev_res=0.1, bev_x=6.0, bev_y=6.0,
+            max_age_steps=20, voxel_size_m=0.1)
+        occ = np.zeros((60, 60), dtype=np.uint8)
+        occ[20, 30] = 1
+        memory.update(occ, (0.0, 0.0, 0.0), step=0)
+        memory.update(
+            np.zeros_like(occ), (0.0, 0.0, 0.0), step=1,
+            observed_local=np.zeros_like(occ, dtype=bool))
+
+        self.assertEqual(memory.point_count, 1)
+
+
+class EscapeDirectionTest(unittest.TestCase):
+    def test_turns_toward_side_with_less_occupancy(self):
+        occ = np.zeros((60, 60), dtype=np.uint8)
+        occ[:30, 31:] = 1
+        self.assertEqual(choose_safer_turn_sign(occ), -1)
+
+        occ.fill(0)
+        occ[:30, :30] = 1
+        self.assertEqual(choose_safer_turn_sign(occ), 1)
+
+    def test_equal_occupancy_uses_planner_turn(self):
+        occ = np.zeros((60, 60), dtype=np.uint8)
+        self.assertEqual(choose_safer_turn_sign(occ, preferred_wz=-0.4), -1)
+        self.assertEqual(choose_safer_turn_sign(occ, preferred_wz=0.4), 1)
 
 
 class FootprintMPPITest(unittest.TestCase):

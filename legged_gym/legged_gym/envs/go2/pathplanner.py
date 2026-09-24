@@ -1,5 +1,7 @@
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
+import json
+import hashlib
 import time
 import isaacgym
 from legged_gym.envs import *
@@ -18,7 +20,9 @@ from legged_gym.envs.go2.a_star_dwa_planner import AStarDWAController
 from legged_gym.envs.go2.mppi_local_planner import (
     FootprintMPPIController,
     WorldObstacleMemory,
+    choose_safer_turn_sign,
 )
+from legged_gym.envs.go2.simulated_vio import SimulatedVIO, wrap_angle
 
 # =====================================================================
 #  所有可视化 / 截图 / 出图开关已统一迁移到 viz_config.py
@@ -260,6 +264,16 @@ class Evaluator:
         )
         self._use_temporal_memory = bool(
             TEMPORAL_MEMORY_ENABLE and self.mode == 'mppi')
+        self.vio = SimulatedVIO(
+            dt=float(self.env.dt),
+            position_sigma_m=VIO_POSITION_SIGMA_M,
+            yaw_sigma_rad=VIO_YAW_SIGMA_RAD,
+            position_drift_m_sqrt_s=VIO_POSITION_DRIFT_M_SQRT_S,
+            yaw_drift_rad_sqrt_s=VIO_YAW_DRIFT_RAD_SQRT_S,
+            latency_steps=VIO_LATENCY_STEPS,
+            dropout_probability=VIO_DROPOUT_PROBABILITY,
+            seed=SCENE_RANDOM_SEED_BASE + VIO_RANDOM_SEED_OFFSET,
+        )
         # ==================== 加这三行 ====================
         self.save_trajectory_dir = SAVE_TRAJECTORY_DIR
         os.makedirs(self.save_trajectory_dir, exist_ok=True)
@@ -314,6 +328,20 @@ class Evaluator:
         self.trial_narrow_steps = 0
         self.trial_min_path_clearance = float("inf")
         self.trial_memory_max_points = 0
+        initial_true_pose = (
+            float(self.env.root_states[0, 0].item()),
+            float(self.env.root_states[0, 1].item()),
+            float(self._get_base_yaw(0)),
+        )
+        self.vio.reset(
+            initial_true_pose,
+            seed=int(SCENE_RANDOM_SEED_BASE) + int(trial_id) + VIO_RANDOM_SEED_OFFSET)
+        self.trial_vio_position_errors = []
+        self.trial_vio_yaw_errors = []
+        self.trial_false_arrival_error = None
+        self.trial_base_contact_steps = 0
+        self.trial_side_contact_steps = 0
+        self.trial_max_base_contact_force = 0.0
         # 停滞逃逸状态复位（见 _reset_stall_escape / viz_config.STALL_*）
         self._reset_stall_escape()
         # 转向锁存状态复位：不把上一轮的转向惯性带进新一轮
@@ -351,6 +379,11 @@ class Evaluator:
             t = step * self.env.dt
             base_pos = self.env.root_states[0, 0:3].cpu().numpy()
             base_yaw = self._get_base_yaw(0)
+            nav_pose = self.vio.update((base_pos[0], base_pos[1], base_yaw))
+            nav_x, nav_y, nav_yaw = map(float, nav_pose)
+            self.trial_vio_position_errors.append(float(np.hypot(
+                nav_x - base_pos[0], nav_y - base_pos[1])))
+            self.trial_vio_yaw_errors.append(abs(wrap_angle(nav_yaw - base_yaw)))
    
             # ===== A. 时间融合（在 update BEV 之前）=====
             if BEV_ENABLE_MEMORY_FUSION and prev_base_pos is not None:
@@ -386,9 +419,12 @@ class Evaluator:
             else:
                 occ_bev_now = occ_bev_raw
             if self._use_temporal_memory:
-                pose_xy_yaw = (base_pos[0], base_pos[1], base_yaw)
+                pose_xy_yaw = (nav_x, nav_y, nav_yaw)
                 if fresh_bev:
-                    self.temporal_memory.update(occ_bev_now, pose_xy_yaw, step)
+                    observed_bev = self.bev.count >= int(BEV_MIN_POINTS)
+                    self.temporal_memory.update(
+                        occ_bev_now, pose_xy_yaw, step,
+                        observed_local=observed_bev)
                 occ_bev = self.temporal_memory.project(pose_xy_yaw)
                 self.trial_memory_max_points = max(
                     self.trial_memory_max_points,
@@ -398,9 +434,9 @@ class Evaluator:
 
             # 3) 计算 waypoint 在机器人坐标（goal_xy_bev）
             wp = self.planner.waypoints[self.planner.current_id]
-            dx_w = wp[0] - base_pos[0]
-            dy_w = wp[1] - base_pos[1]
-            c = np.cos(-base_yaw); s = np.sin(-base_yaw)
+            dx_w = wp[0] - nav_x
+            dy_w = wp[1] - nav_y
+            c = np.cos(-nav_yaw); s = np.sin(-nav_yaw)
             dx_r = c * dx_w - s * dy_w   # forward
             dy_r = s * dx_w + c * dy_w   # left
 
@@ -421,15 +457,15 @@ class Evaluator:
 
             # ===== 2. FMM路径（robot → world）=====
             raw_xy = []
-            cos_yaw = np.cos(base_yaw)
-            sin_yaw = np.sin(base_yaw)
+            cos_yaw = np.cos(nav_yaw)
+            sin_yaw = np.sin(nav_yaw)
             for r, col in raw_path:
                 # BEV → robot frame
                 x = r * self.fmm.bev_res
                 y = (col - self.fmm.W // 2) * self.fmm.bev_res
                 # robot → world
-                wx = base_pos[0] + cos_yaw * x - sin_yaw * y
-                wy = base_pos[1] + sin_yaw * x + cos_yaw * y
+                wx = nav_x + cos_yaw * x - sin_yaw * y
+                wy = nav_y + sin_yaw * x + cos_yaw * y
                 raw_xy.append([wx, wy])
             raw_xy = np.array(raw_xy)
             self._record_trial_fmm_segment(step, raw_xy)
@@ -485,7 +521,7 @@ class Evaluator:
                     if raw_path else None
                 print("[start-debug] step=%d yaw=%+.3f goal_robot=(%+.2f,%+.2f) "
                       "occ=%d reachable=%s lookahead=%s wz=%+.3f"
-                      % (step, base_yaw, dx_r, dy_r, int(np.count_nonzero(occ_bev)),
+                      % (step, nav_yaw, dx_r, dy_r, int(np.count_nonzero(occ_bev)),
                          self._planner_reachable, lookahead_point, wz))
 
             # ===== 轨迹优化（仅用于可视化 / 分析 / 未来 MPC）=====
@@ -517,13 +553,18 @@ class Evaluator:
             thresh = (NAV_MID_GOAL_REACH_THRESH_M
                       if self.planner.current_id < n_wp - 1
                       else NAV_GOAL_REACH_THRESH_M)
-            # 到达判定必须使用机器人与目标的真实欧氏距离。FMM 场在双层代价模式下是
-            # 加权 travel time，不再等于几何距离，用它会让到达半径随障碍代价变化。
+            # 规划器按 VIO 估计位姿判断到达；真值距离只用于独立评测，不反馈控制。
+            # FMM 场在双层代价模式下是加权 travel time，不能代替几何距离。
             goal_distance_m = float(np.hypot(dx_w, dy_w))
+            true_goal_distance_m = float(np.hypot(
+                wp[0] - base_pos[0], wp[1] - base_pos[1]))
             if goal_distance_m <= float(thresh) or crossed:
                 if is_final_goal:
-                    print("最终目标到达误差: %.3f m (阈值 %.3f m)"
-                          % (goal_distance_m, NAV_GOAL_REACH_THRESH_M))
+                    print("最终目标估计/真值误差: %.3f / %.3f m (阈值 %.3f m)"
+                          % (goal_distance_m, true_goal_distance_m,
+                             NAV_GOAL_REACH_THRESH_M))
+                    if true_goal_distance_m > float(NAV_GOAL_REACH_THRESH_M):
+                        self.trial_false_arrival_error = true_goal_distance_m
                 if raw_path is not None and len(raw_path) > 1:
                     # 原来写死 * 0.05，改 bev_res 后路径长度会算错，这里跟着 BEV_RES 走
                     pts = np.array(raw_path) * BEV_RES
@@ -564,6 +605,11 @@ class Evaluator:
                 if self.planner.finished:
                     self._save_trial_route_plot(trial_id, "success")
                     self._show_completed_route()
+                    if self.trial_false_arrival_error is not None:
+                        return self._handle_fail(
+                            "VIO false arrival (true error %.3f m)"
+                            % self.trial_false_arrival_error,
+                            elapsed_time)
                     self.stats["success_count"] += 1
                     return self._handle_success(elapsed_time)
                 else:
@@ -605,7 +651,8 @@ class Evaluator:
                 self._stall_travel_buf = []
                 in_escape = False
             else:
-                in_escape = self._update_stall_escape(step_dist)
+                in_escape = self._update_stall_escape(
+                    step_dist, occ_bev=occ_bev, preferred_wz=wz)
             if in_escape and STALL_OVERRIDE_PLANNER:
                 esc = self._stall_escape_cmd()
                 if esc is not None:
@@ -617,6 +664,7 @@ class Evaluator:
             self.env.commands[0, 2] = wz
             self._update_live_follow_camera()
             obs, _, _, dones, infos, _, _ = self.env.step(actions)
+            self._update_contact_metrics()
             # --- IsaacGym viewer 实时叠加可视化 ---
             # 节流：LIVE_DRAW_INTERVAL>1 时按间隔重画，省掉大量 add_lines/clear_lines
             if (LIVE_DRAW_VIEWER_OVERLAY and self.render
@@ -672,23 +720,48 @@ class Evaluator:
                     np.save(save_path, traj)
                     print(f"✅ 轨迹已保存到: {save_path}")
                 self._save_trial_route_plot(trial_id, "environment_termination")
-                return self._handle_fail("environment termination", elapsed_time)
+                return self._handle_fail(term_reason, elapsed_time)
 
     def _print_random_obstacle_layout(self):
         """Print the current trial layout so failed cases can be reproduced and inspected."""
         if not SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL:
             return
-        groups = []
+        metadata = self._obstacle_layout_metadata()
+        groups = [
+            "大石头=%d" % metadata["big_stone_count"],
+            "小碎石=%d" % metadata["small_stone_count"],
+            "树=%d" % metadata["tree_count"],
+            "hash=%s" % metadata["obstacle_layout_hash"],
+        ]
         stones = getattr(self.env, "stone_root_states", None)
         if stones is not None and stones.shape[1] > 0:
-            xy = stones[0, :, :2].detach().cpu().numpy()
-            groups.append("stones=" + str(np.round(xy, 2).tolist()))
+            xy = stones[0, :min(5, stones.shape[1]), :2].detach().cpu().numpy()
+            groups.append("stones前5=" + str(np.round(xy, 2).tolist()))
         trees = getattr(self.env, "static_obstacle_root_states", None)
         if trees is not None and trees.shape[1] > 0:
-            xy = trees[0, :, :2].detach().cpu().numpy()
-            groups.append("trees=" + str(np.round(xy, 2).tolist()))
+            xy = trees[0, :min(5, trees.shape[1]), :2].detach().cpu().numpy()
+            groups.append("trees前5=" + str(np.round(xy, 2).tolist()))
         if groups:
             print("随机障碍布局: " + " | ".join(groups))
+
+    def _obstacle_layout_metadata(self):
+        """Return compact, stable metadata for paired-scene verification."""
+        digest = hashlib.sha256()
+        for name in ("stone_root_states", "static_obstacle_root_states"):
+            states = getattr(self.env, name, None)
+            if states is None or states.shape[1] == 0:
+                values = np.empty((0, 3), dtype="<f4")
+            else:
+                values = states[0, :, :3].detach().cpu().numpy()
+                values = np.round(values, 4).astype("<f4", copy=False)
+            digest.update(name.encode("ascii"))
+            digest.update(values.tobytes())
+        return {
+            "big_stone_count": int(SCENE_NUM_BIG_STONES),
+            "small_stone_count": int(SCENE_NUM_SMALL_STONES_TOTAL),
+            "tree_count": int(getattr(self.env, "num_static_obstacle_actors", 0)),
+            "obstacle_layout_hash": digest.hexdigest()[:16],
+        }
 
     def _reset_stall_escape(self):
         """复位停滞逃逸状态机（每个 trial 开始时调用）。"""
@@ -698,7 +771,7 @@ class Evaluator:
         self._stall_escape_count = 0     # 本 trial 已逃逸次数
         self._stall_turn_sign = 1.0      # 逃逸转向方向（交替用）
 
-    def _update_stall_escape(self, step_dist):
+    def _update_stall_escape(self, step_dist, occ_bev=None, preferred_wz=0.0):
         """更新停滞检测状态机，返回本步是否处于逃逸中（True 则上层指令被覆盖）。
 
         为什么需要（2026-09-17 停滞取证探针实测，/tmp/pitch/logs/stall_probe.pkl）：
@@ -743,7 +816,10 @@ class Evaluator:
         if self._stall_escape_count >= int(STALL_MAX_ESCAPES):
             return False        # 放弃逃逸，让环境按原逻辑判 timeout/卡住
         self._stall_escape_count += 1
-        if STALL_TURN_ALTERNATE:
+        if STALL_TURN_USE_BEV and occ_bev is not None:
+            self._stall_turn_sign = float(choose_safer_turn_sign(
+                occ_bev, preferred_wz=preferred_wz))
+        elif STALL_TURN_ALTERNATE:
             self._stall_turn_sign = -self._stall_turn_sign
         self._stall_phase = "reverse"
         self._stall_phase_left = int(STALL_REVERSE_STEPS)
@@ -758,7 +834,7 @@ class Evaluator:
         if self._stall_phase == "reverse":
             return float(STALL_REVERSE_VX), 0.0
         if self._stall_phase == "turn":
-            return 0.0, float(STALL_TURN_WZ) * float(self._stall_turn_sign)
+            return 0.0, abs(float(STALL_TURN_WZ)) * float(self._stall_turn_sign)
         return None
 
     def _set_trial_follow_camera(self):
@@ -1903,6 +1979,7 @@ class Evaluator:
         print(f"Command Wz Variation  : {metrics['cmd_wz_variation']:.4f} rad/s/step")
         print(f"Command Wz Sign Flips : {metrics['cmd_wz_sign_flips']}")
         self._print_narrow_passage_stats()
+        self._write_trial_result(False, reason, elapsed_time, metrics)
         return False, elapsed_time
     
     def _handle_success(self, elapsed_time):
@@ -1918,7 +1995,62 @@ class Evaluator:
         print(f"Command Wz Variation  : {metrics['cmd_wz_variation']:.4f} rad/s/step")
         print(f"Command Wz Sign Flips : {metrics['cmd_wz_sign_flips']}")
         self._print_narrow_passage_stats()
+        self._write_trial_result(True, "success", elapsed_time, metrics)
         return True, elapsed_time
+
+    def _write_trial_result(self, success, reason, elapsed_time, metrics):
+        if not RESULT_JSON_PATH:
+            return
+        pos = np.asarray(self.trial_vio_position_errors, dtype=np.float64)
+        yaw = np.asarray(self.trial_vio_yaw_errors, dtype=np.float64)
+        plan = np.asarray(self.trial_step_times, dtype=np.float64)
+        smooth = np.asarray(self.trial_step_smoothness, dtype=np.float64)
+        record = {
+            "success": bool(success),
+            "failure_reason": str(reason),
+            "scene": ACTIVE_SCENE_PRESET,
+            "scene_seed": int(SCENE_RANDOM_SEED_BASE),
+            "planner_mode": self.mode,
+            "temporal_memory": bool(self._use_temporal_memory),
+            "soft_cost": bool(FMM_USE_SOFT_COST),
+            "actor_truth_whitelist": bool(BEV_OBSTACLE_ACTORS_ONLY),
+            "vio_noise_level": VIO_NOISE_LEVEL,
+            "elapsed_s": float(elapsed_time),
+            "distance_m": float(self.trial_real_distance),
+            "planning_mean_ms": float(plan.mean()) if plan.size else 0.0,
+            "planning_p95_ms": float(np.percentile(plan, 95)) if plan.size else 0.0,
+            "path_smoothness_mean": float(smooth.mean()) if smooth.size else None,
+            "energy_torque_sq_mean": float(metrics["energy"]),
+            "cmd_wz_variation": float(metrics["cmd_wz_variation"]),
+            "cmd_wz_sign_flips": int(metrics["cmd_wz_sign_flips"]),
+            "orientation_error_rad": float(metrics["orientation_error"]),
+            "angular_vel_error_rad_s": float(metrics["angular_vel_error"]),
+            "narrow_steps": int(self.trial_narrow_steps),
+            "min_path_clearance_m": (
+                float(self.trial_min_path_clearance)
+                if np.isfinite(self.trial_min_path_clearance) else None),
+            "memory_max_voxels": int(self.trial_memory_max_points),
+            "body_contact_steps": int(self.trial_base_contact_steps),
+            "side_contact_steps": int(self.trial_side_contact_steps),
+            "peak_body_contact_n": float(self.trial_max_base_contact_force),
+            "vio_position_rms_m": (
+                float(np.sqrt(np.mean(pos ** 2))) if pos.size else 0.0),
+            "vio_yaw_rms_deg": (
+                float(np.rad2deg(np.sqrt(np.mean(yaw ** 2)))) if yaw.size else 0.0),
+            "false_arrival_true_error_m": (
+                float(self.trial_false_arrival_error)
+                if self.trial_false_arrival_error is not None else None),
+            "final_x_m": float(self.env.root_states[0, 0].item()),
+            "final_y_m": float(self.env.root_states[0, 1].item()),
+            "waypoint_progress": float(
+                self.planner.current_id / max(1, len(self.planner.waypoints))),
+            "stall_escape_count": int(self._stall_escape_count),
+        }
+        record.update(self._obstacle_layout_metadata())
+        output_path = os.path.abspath(RESULT_JSON_PATH)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as fh:
+            json.dump(record, fh, ensure_ascii=False, indent=2, sort_keys=True)
 
     def _print_narrow_passage_stats(self):
         clearance = self.trial_min_path_clearance
@@ -1928,6 +2060,39 @@ class Evaluator:
         if self._use_temporal_memory:
             print("Temporal Memory      : max %d world voxels"
                   % self.trial_memory_max_points)
+        if self.trial_vio_position_errors:
+            pos = np.asarray(self.trial_vio_position_errors, dtype=np.float64)
+            yaw = np.asarray(self.trial_vio_yaw_errors, dtype=np.float64)
+            print("VIO Pose Error       : rms %.3f m / %.2f deg, max %.3f m / %.2f deg"
+                  % (float(np.sqrt(np.mean(pos ** 2))),
+                     float(np.rad2deg(np.sqrt(np.mean(yaw ** 2)))),
+                     float(np.max(pos)), float(np.rad2deg(np.max(yaw)))))
+        print("Body Contact         : %d steps, side %d steps, peak %.1f N"
+              % (self.trial_base_contact_steps, self.trial_side_contact_steps,
+                 self.trial_max_base_contact_force))
+
+    def _update_contact_metrics(self):
+        """Record simulator contact truth for evaluation only, never for planning."""
+        try:
+            indices = self.env.termination_contact_indices
+            if indices.numel() == 0:
+                return
+            forces = self.env.contact_forces[0, indices, :]
+            magnitude = torch.norm(forces, dim=-1)
+            peak = float(magnitude.max().item())
+            self.trial_max_base_contact_force = max(
+                self.trial_max_base_contact_force, peak)
+            threshold = float(getattr(
+                getattr(self.env.cfg, "termination", None),
+                "collision_force_threshold", 1.0))
+            if bool(torch.any(magnitude > threshold)):
+                self.trial_base_contact_steps += 1
+            horizontal = torch.norm(forces[:, :2], dim=-1)
+            if bool(torch.any(horizontal > threshold)):
+                self.trial_side_contact_steps += 1
+        except Exception:
+            # Metrics must never alter navigation behavior.
+            return
 
 
     def _get_base_yaw(self, env_id=0):
