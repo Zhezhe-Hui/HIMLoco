@@ -53,7 +53,7 @@ Thumbs.db
 # logs
 legged_gym/logs
 logs
-runs
+#runs
 
 # ---------------------------------------------------------------------
 # assets/ 素材与产出目录约定（详见 legged_gym/legged_gym/envs/go2/viz_config.py）
@@ -65,8 +65,20 @@ runs
 # 注意：历史上已用 git mv 迁入 assets/runs/ 的素材仍被跟踪，
 #       下面的规则只影响之后新生成的文件。
 # ---------------------------------------------------------------------
-assets/runs/
+#assets/runs/
 
 # other
 *.egg-info
-__pycache__
+__pycache__# 忽略runs下所有内容
+assets/runs/*
+# 放行benchmark目录
+!assets/runs/navigation_benchmark/
+!assets/runs/navigation_benchmark/**
+# 覆盖前面的runs忽略规则，放行这个benchmark目录
+!assets/runs/navigation_benchmark/
+!assets/runs/navigation_benchmark/**
+# 忽略assets/runs下所有内容
+assets/runs/*
+# 例外放行benchmark目录
+!assets/runs/navigation_benchmark/
+!assets/runs/navigation_benchmark/**

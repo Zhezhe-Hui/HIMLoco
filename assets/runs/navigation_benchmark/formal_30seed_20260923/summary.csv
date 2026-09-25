@@ -1,0 +1,5 @@
+body_contact_steps_mean,body_contact_steps_std,cmd_wz_sign_flips_mean,cmd_wz_sign_flips_std,cmd_wz_variation_mean,cmd_wz_variation_std,distance_m_mean,distance_m_std,elapsed_s_mean,elapsed_s_std,energy_torque_sq_mean,energy_torque_sq_std,failure_reasons,method,min_path_clearance_m_mean,min_path_clearance_m_std,path_smoothness_mean,path_smoothness_std,planning_p95_ms_mean,planning_p95_ms_std,planning_time_ms_mean,planning_time_ms_std,side_contact_steps_mean,side_contact_steps_std,stall_escape_count_mean,stall_escape_count_std,success_rate,successes,trials
+0.0,0.0,,,,,,,,,,,"{""卡住(指令1.00实际0.012 yawrate+0.01)"": 2}",astar_dwa,,,,,,,,,0.0,0.0,6.0,0.0,0.0,0,2
+0.0,0.0,,,,,,,,,,,"{""卡住(指令1.00实际0.010 yawrate+0.02)"": 1, ""卡住(指令1.00实际0.011 yawrate-0.01)"": 1}",fmm_fixed,,,,,,,,,0.0,0.0,6.0,0.0,0.0,0,2
+0.0,0.0,,,,,,,,,,,"{""卡住(指令1.00实际0.007 yawrate+0.02)"": 1, ""卡住(指令1.00实际0.013 yawrate+0.01)"": 1}",fmm_soft,,,,,,,,,0.0,0.0,6.0,0.0,0.0,0,2
+0.0,0.0,,,,,,,,,,,"{""卡住(指令1.00实际0.008 yawrate-0.00)"": 1, ""卡住(指令1.00实际0.019 yawrate+0.01)"": 1}",mppi,,,,,,,,,0.0,0.0,6.0,0.0,0.0,0,2

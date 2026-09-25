@@ -1,0 +1,15 @@
+{
+  "scene": "random_corridor",
+  "methods": [
+    "fmm_fixed",
+    "fmm_soft",
+    "mppi",
+    "astar_dwa"
+  ],
+  "seed_start": 20260931,
+  "num_seeds": 1,
+  "vio": "ideal",
+  "python": "/home/fabu/miniconda3/envs/himloco/bin/python",
+  "git_commit": "47f46ddd10976164b3c2a38af2d9755a7ccd2b0f",
+  "git_dirty": true
+}

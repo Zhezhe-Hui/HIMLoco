@@ -1,0 +1,287 @@
+{
+  "reference": "mppi",
+  "methods": [
+    {
+      "method": "astar_dwa",
+      "trials": 30,
+      "successes": 2,
+      "success_rate": 0.06666666666666667,
+      "success_ci95_low": 0.018477023791270378,
+      "success_ci95_high": 0.2132345836261692,
+      "failure_categories": {
+        "stuck": 27,
+        "success": 2,
+        "collision": 1
+      },
+      "elapsed_s_mean": 41.38999907486141,
+      "elapsed_s_std": 4.049999909475446,
+      "distance_m_mean": 27.370205020397407,
+      "distance_m_std": 0.8336247703009576,
+      "cmd_wz_variation_mean": 0.008769470953183953,
+      "cmd_wz_variation_std": 0.00096821540273226,
+      "cmd_wz_sign_flips_mean": 9.0,
+      "cmd_wz_sign_flips_std": 3.0,
+      "planning_mean_ms_mean": 11.758657983879171,
+      "planning_mean_ms_std": 0.25868102522245184,
+      "energy_torque_sq_mean_mean": 734.7036437988281,
+      "energy_torque_sq_mean_std": 7.826751708984375,
+      "min_path_clearance_m_mean": null,
+      "min_path_clearance_m_std": null
+    },
+    {
+      "method": "fmm_fixed",
+      "trials": 30,
+      "successes": 16,
+      "success_rate": 0.5333333333333333,
+      "success_ci95_low": 0.36142299619873297,
+      "success_ci95_high": 0.6976761109230025,
+      "failure_categories": {
+        "success": 16,
+        "timeout": 3,
+        "stuck": 9,
+        "collision": 2
+      },
+      "elapsed_s_mean": 51.90249883988872,
+      "elapsed_s_std": 4.7241817018730785,
+      "distance_m_mean": 27.616773229929663,
+      "distance_m_std": 0.9289879910524481,
+      "cmd_wz_variation_mean": 0.026241454115068237,
+      "cmd_wz_variation_std": 0.0017287375666193822,
+      "cmd_wz_sign_flips_mean": 29.4375,
+      "cmd_wz_sign_flips_std": 2.978438139360964,
+      "planning_mean_ms_mean": 6.724100059546429,
+      "planning_mean_ms_std": 0.06309276333135133,
+      "energy_torque_sq_mean_mean": 651.9522171020508,
+      "energy_torque_sq_mean_std": 22.253517810221688,
+      "min_path_clearance_m_mean": 0.25495097041130066,
+      "min_path_clearance_m_std": 0.0
+    },
+    {
+      "method": "fmm_soft",
+      "trials": 30,
+      "successes": 15,
+      "success_rate": 0.5,
+      "success_ci95_low": 0.33154125640533766,
+      "success_ci95_high": 0.6684587435946623,
+      "failure_categories": {
+        "success": 15,
+        "stuck": 10,
+        "timeout": 2,
+        "collision": 3
+      },
+      "elapsed_s_mean": 39.73999911174178,
+      "elapsed_s_std": 4.118601612404407,
+      "distance_m_mean": 26.177588551009407,
+      "distance_m_std": 0.988720881644139,
+      "cmd_wz_variation_mean": 0.027400571991236352,
+      "cmd_wz_variation_std": 0.0027688019271159994,
+      "cmd_wz_sign_flips_mean": 23.533333333333335,
+      "cmd_wz_sign_flips_std": 4.759084879353265,
+      "planning_mean_ms_mean": 6.5965386190268,
+      "planning_mean_ms_std": 0.12123418288182251,
+      "energy_torque_sq_mean_mean": 678.9584350585938,
+      "energy_torque_sq_mean_std": 22.818546131633074,
+      "min_path_clearance_m_mean": 0.4124046464761098,
+      "min_path_clearance_m_std": 0.05405928855379034
+    },
+    {
+      "method": "mppi",
+      "trials": 30,
+      "successes": 17,
+      "success_rate": 0.5666666666666667,
+      "success_ci95_low": 0.3919730700081361,
+      "success_ci95_high": 0.7262251442353347,
+      "failure_categories": {
+        "success": 17,
+        "stuck": 11,
+        "timeout": 2
+      },
+      "elapsed_s_mean": 37.18117563952418,
+      "elapsed_s_std": 5.298769863530709,
+      "distance_m_mean": 24.90442804005654,
+      "distance_m_std": 1.1129615261710701,
+      "cmd_wz_variation_mean": 0.012191691253203617,
+      "cmd_wz_variation_std": 0.0018206254736879478,
+      "cmd_wz_sign_flips_mean": 22.705882352941178,
+      "cmd_wz_sign_flips_std": 2.8026186469580225,
+      "planning_mean_ms_mean": 9.342502588240015,
+      "planning_mean_ms_std": 0.26020470017236946,
+      "energy_torque_sq_mean_mean": 662.7059649299173,
+      "energy_torque_sq_mean_std": 24.91514401120958,
+      "min_path_clearance_m_mean": 0.4063350172603832,
+      "min_path_clearance_m_std": 0.0644713689290597
+    }
+  ],
+  "paired": [
+    {
+      "reference": "mppi",
+      "other": "astar_dwa",
+      "reference_only_success": 15,
+      "other_only_success": 0,
+      "common_successes": 2,
+      "mcnemar_exact_p": 6.103515625e-05,
+      "metrics": {
+        "elapsed_s": {
+          "n": 2,
+          "reference_mean": 32.509999273344874,
+          "other_mean": 41.38999907486141,
+          "mean_difference": -8.879999801516533,
+          "wilcoxon_p": 0.5
+        },
+        "distance_m": {
+          "n": 2,
+          "reference_mean": 24.129550508187094,
+          "other_mean": 27.370205020397407,
+          "mean_difference": -3.2406545122103125,
+          "wilcoxon_p": 0.5
+        },
+        "cmd_wz_variation": {
+          "n": 2,
+          "reference_mean": 0.01040287235778605,
+          "other_mean": 0.008769470953183953,
+          "mean_difference": 0.0016334014046020958,
+          "wilcoxon_p": 0.5
+        },
+        "cmd_wz_sign_flips": {
+          "n": 2,
+          "reference_mean": 22.5,
+          "other_mean": 9.0,
+          "mean_difference": 13.5,
+          "wilcoxon_p": 0.5
+        },
+        "planning_mean_ms": {
+          "n": 2,
+          "reference_mean": 9.200150205876444,
+          "other_mean": 11.758657983879171,
+          "mean_difference": -2.558507778002726,
+          "wilcoxon_p": 0.5
+        },
+        "energy_torque_sq_mean": {
+          "n": 2,
+          "reference_mean": 678.2005920410156,
+          "other_mean": 734.7036437988281,
+          "mean_difference": -56.5030517578125,
+          "wilcoxon_p": 0.5
+        }
+      }
+    },
+    {
+      "reference": "mppi",
+      "other": "fmm_fixed",
+      "reference_only_success": 6,
+      "other_only_success": 5,
+      "common_successes": 11,
+      "mcnemar_exact_p": 1.0,
+      "metrics": {
+        "elapsed_s": {
+          "n": 11,
+          "reference_mean": 38.06181733107025,
+          "other_mean": 52.165453379465774,
+          "mean_difference": -14.103636048395526,
+          "wilcoxon_p": 0.0009765625
+        },
+        "distance_m": {
+          "n": 11,
+          "reference_mean": 25.052378659619286,
+          "other_mean": 27.72342747028911,
+          "mean_difference": -2.671048810669824,
+          "wilcoxon_p": 0.0009765625
+        },
+        "cmd_wz_variation": {
+          "n": 11,
+          "reference_mean": 0.012313813446481884,
+          "other_mean": 0.02620261365237461,
+          "mean_difference": -0.013888800205892725,
+          "wilcoxon_p": 0.0009765625
+        },
+        "cmd_wz_sign_flips": {
+          "n": 11,
+          "reference_mean": 23.272727272727273,
+          "other_mean": 29.90909090909091,
+          "mean_difference": -6.636363636363637,
+          "wilcoxon_p": 0.005033508200606249
+        },
+        "planning_mean_ms": {
+          "n": 11,
+          "reference_mean": 9.301987611351642,
+          "other_mean": 6.732697241982975,
+          "mean_difference": 2.569290369368667,
+          "wilcoxon_p": 0.0009765625
+        },
+        "energy_torque_sq_mean": {
+          "n": 11,
+          "reference_mean": 661.7982455166904,
+          "other_mean": 649.260947487571,
+          "mean_difference": 12.537298029119318,
+          "wilcoxon_p": 0.365234375
+        },
+        "min_path_clearance_m": {
+          "n": 11,
+          "reference_mean": 0.3962886170907454,
+          "other_mean": 0.25495097041130066,
+          "mean_difference": 0.14133764667944473,
+          "wilcoxon_p": 0.0009765625
+        }
+      }
+    },
+    {
+      "reference": "mppi",
+      "other": "fmm_soft",
+      "reference_only_success": 6,
+      "other_only_success": 4,
+      "common_successes": 11,
+      "mcnemar_exact_p": 0.75390625,
+      "metrics": {
+        "elapsed_s": {
+          "n": 11,
+          "reference_mean": 36.481817366386004,
+          "other_mean": 39.17999912425876,
+          "mean_difference": -2.6981817578727547,
+          "wilcoxon_p": 0.240234375
+        },
+        "distance_m": {
+          "n": 11,
+          "reference_mean": 24.808940003819192,
+          "other_mean": 25.824052812769796,
+          "mean_difference": -1.0151128089506032,
+          "wilcoxon_p": 0.0537109375
+        },
+        "cmd_wz_variation": {
+          "n": 11,
+          "reference_mean": 0.011579804631725752,
+          "other_mean": 0.02757783896278361,
+          "mean_difference": -0.01599803433105786,
+          "wilcoxon_p": 0.0009765625
+        },
+        "cmd_wz_sign_flips": {
+          "n": 11,
+          "reference_mean": 22.90909090909091,
+          "other_mean": 23.181818181818183,
+          "mean_difference": -0.2727272727272727,
+          "wilcoxon_p": 0.8984375
+        },
+        "planning_mean_ms": {
+          "n": 11,
+          "reference_mean": 9.295162898523039,
+          "other_mean": 6.615531548727352,
+          "mean_difference": 2.679631349795686,
+          "wilcoxon_p": 0.0009765625
+        },
+        "energy_torque_sq_mean": {
+          "n": 11,
+          "reference_mean": 671.923789284446,
+          "other_mean": 681.643310546875,
+          "mean_difference": -9.719521262428977,
+          "wilcoxon_p": 0.5771484375
+        },
+        "min_path_clearance_m": {
+          "n": 11,
+          "reference_mean": 0.40231795744462445,
+          "other_mean": 0.40837610038844024,
+          "mean_difference": -0.006058142943815751,
+          "wilcoxon_p": 0.8125422341993517
+        }
+      }
+    }
+  ]
+}

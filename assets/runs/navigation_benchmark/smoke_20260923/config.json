@@ -1,0 +1,10 @@
+{
+  "scene": "empty",
+  "methods": [
+    "fmm_fixed"
+  ],
+  "seed_start": 20261000,
+  "num_seeds": 1,
+  "vio": "ideal",
+  "python": "/home/fabu/miniconda3/envs/himloco/bin/python"
+}

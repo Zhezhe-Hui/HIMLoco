@@ -1,0 +1,33 @@
+[
+  {
+    "method": "fmm_fixed",
+    "trials": 1,
+    "successes": 0,
+    "success_rate": 0.0,
+    "failure_reasons": "{\"process_error\": 1}",
+    "elapsed_s_mean": null,
+    "elapsed_s_std": null,
+    "distance_m_mean": null,
+    "distance_m_std": null,
+    "planning_time_ms_mean": null,
+    "planning_time_ms_std": null,
+    "planning_p95_ms_mean": null,
+    "planning_p95_ms_std": null,
+    "path_smoothness_mean": null,
+    "path_smoothness_std": null,
+    "cmd_wz_variation_mean": null,
+    "cmd_wz_variation_std": null,
+    "cmd_wz_sign_flips_mean": null,
+    "cmd_wz_sign_flips_std": null,
+    "energy_torque_sq_mean": null,
+    "energy_torque_sq_std": null,
+    "body_contact_steps_mean": null,
+    "body_contact_steps_std": null,
+    "side_contact_steps_mean": null,
+    "side_contact_steps_std": null,
+    "stall_escape_count_mean": null,
+    "stall_escape_count_std": null,
+    "min_path_clearance_m_mean": null,
+    "min_path_clearance_m_std": null
+  }
+]

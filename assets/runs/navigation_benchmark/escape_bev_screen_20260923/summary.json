@@ -1,0 +1,33 @@
+[
+  {
+    "method": "mppi",
+    "trials": 3,
+    "successes": 2,
+    "success_rate": 0.6666666666666666,
+    "failure_reasons": "{\"Timeout\": 1}",
+    "elapsed_s_mean": 34.909999219700694,
+    "elapsed_s_std": 0.3899999912828207,
+    "distance_m_mean": 24.73702594506176,
+    "distance_m_std": 0.2789198992031743,
+    "planning_mean_ms_mean": 9.344270399661479,
+    "planning_mean_ms_std": 0.03965374545924849,
+    "planning_p95_ms_mean": 21.364152431488037,
+    "planning_p95_ms_std": 0.045239925384521484,
+    "path_smoothness_mean_mean": 0.04529991926473401,
+    "path_smoothness_mean_std": 0.0020996771095815013,
+    "cmd_wz_variation_mean": 0.0115452803832407,
+    "cmd_wz_variation_std": 0.0014504334287011936,
+    "cmd_wz_sign_flips_mean": 23.0,
+    "cmd_wz_sign_flips_std": 1.0,
+    "energy_torque_sq_mean_mean": 682.8730163574219,
+    "energy_torque_sq_mean_std": 1.647369384765625,
+    "body_contact_steps_mean": 0.0,
+    "body_contact_steps_std": 0.0,
+    "side_contact_steps_mean": 0.0,
+    "side_contact_steps_std": 0.0,
+    "stall_escape_count_mean": 2.0,
+    "stall_escape_count_std": 2.8284271247461903,
+    "min_path_clearance_m_mean": 0.4294901192188263,
+    "min_path_clearance_m_std": 0.06548461318016052
+  }
+]

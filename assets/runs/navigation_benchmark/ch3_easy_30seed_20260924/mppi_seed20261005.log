@@ -1,0 +1,86 @@
+Importing module 'gym_38' (/home/fabu/HIMLoco/libraries/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/fabu/HIMLoco/libraries/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu117
+Device count 1
+/home/fabu/HIMLoco/libraries/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Using /home/fabu/.cache/torch_extensions/py38_cu117 as PyTorch extensions root...
+Emitting ninja build file /home/fabu/.cache/torch_extensions/py38_cu117/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loading extension module gymtorch...
+/home/fabu/miniconda3/envs/himloco/lib/python3.8/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3190.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+[viz_config] 配置一致性检查通过 ✓
+[viz_config] 提示: CAM_READ_RGB=False（只读 depth，不拷 RGB）：当前无任何消费方需要 RGB，属预期省资源配置 —— 每步少拷一张 float32，泄漏量减半
+[viz_config] preset=nav_only | 已开启: BEV_CLEARANCE_USE_RAW_MAP, BEV_ENABLE_UPDATE, BEV_USE_AXIAL_GEOM, CAM_ENABLE, CAM_READ_ENABLE, EVAL_TERRAIN_CURRICULUM, EXPORT_POLICY, FMM_STOP_IF_UNREACHABLE, FMM_TURN_HYSTERESIS_ENABLE, FMM_USE_PATH_LOOKAHEAD, FMM_USE_SOFT_COST, METRICS_PRINT_STATS, NARROW_PASSAGE_ENABLE, NAV_ADVANCE_ON_CROSS, NAV_RANDOM_STRAIGHT_ROUTE, PLAY_PLOT_STATES, SAFETY_MEM_GUARD_ENABLE, SCENE_ENABLE_BIG_STONES, SCENE_ENABLE_STONES, SCENE_ENABLE_TREES, SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL, SCENE_SMALL_STONES_STATIC, SCENE_TREE_REUSE_DUPLICATE_ASSETS, SPAWN_RANDOMIZE_EACH_TRIAL, SPEED_MOD_ENABLE, SPEED_TURN_COUPLING_ENABLE, STALL_ESCAPE_ENABLE, STALL_OVERRIDE_PLANNER, STALL_TURN_ALTERNATE, STALL_TURN_USE_BEV, TERM_ENABLE_CLIFF_FALL, TERM_ENABLE_COLLISION, TERM_ENABLE_STUCK, TERM_ENABLE_TIMEOUT, TERRAIN_WALL_ENABLE
+scene=random_corridor_easy | 石头=110(大10+小100,静态) | 树=开 | 地形=height | 路线=直线(出生x(6.0, 6.0)/y(3.0, 9.0) -> 目标x30.0)
+相机读取: depth=开 rgb=关 | 感知降频=每4步 | 模式=MPPI | FMM每步(约50Hz),MPPI每4步,世界记忆=关
+BEV建图=开 ROI起始=0.55 台阶判据=关 记忆融合=关 | FMM代价=双层(硬半径0.20m,软距离0.65m,权重4.0) | 速度调制=开(最低0.25m/s,2.0→0.7m) | 横向符号-1 俯角0° 近距掩蔽0.00m | 转向锁存=障碍区开(阈值0.05,保持40步),空地死区0.02rad
+障碍白名单=关(掩膜半径0.80m,刹车用原始几何图) | 停滞逃逸=开(窗口30步<0.05m触发,倒退40步@-0.4m/s+转向35步@-0.9rad/s,BEV择空侧,上限6次) | 急转降速档=关 | 指令重采样=1e+06s(1e6=已禁止底层随机覆盖) | 相机跟随=关 | VIO=ideal(σxy=0.000m,σyaw=0.00deg,延迟0步,丢帧0.0%)
+[viz_config] 配置一致性检查通过 ✓
+[viz_config] 提示: CAM_READ_RGB=False（只读 depth，不拷 RGB）：当前无任何消费方需要 RGB，属预期省资源配置 —— 每步少拷一张 float32，泄漏量减半
+[viz_config] preset=nav_only | 已开启: BEV_CLEARANCE_USE_RAW_MAP, BEV_ENABLE_UPDATE, BEV_USE_AXIAL_GEOM, CAM_ENABLE, CAM_READ_ENABLE, EVAL_TERRAIN_CURRICULUM, EXPORT_POLICY, FMM_STOP_IF_UNREACHABLE, FMM_TURN_HYSTERESIS_ENABLE, FMM_USE_PATH_LOOKAHEAD, FMM_USE_SOFT_COST, METRICS_PRINT_STATS, NARROW_PASSAGE_ENABLE, NAV_ADVANCE_ON_CROSS, NAV_RANDOM_STRAIGHT_ROUTE, PLAY_PLOT_STATES, SAFETY_MEM_GUARD_ENABLE, SCENE_ENABLE_BIG_STONES, SCENE_ENABLE_STONES, SCENE_ENABLE_TREES, SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL, SCENE_SMALL_STONES_STATIC, SCENE_TREE_REUSE_DUPLICATE_ASSETS, SPAWN_RANDOMIZE_EACH_TRIAL, SPEED_MOD_ENABLE, SPEED_TURN_COUPLING_ENABLE, STALL_ESCAPE_ENABLE, STALL_OVERRIDE_PLANNER, STALL_TURN_ALTERNATE, STALL_TURN_USE_BEV, TERM_ENABLE_CLIFF_FALL, TERM_ENABLE_COLLISION, TERM_ENABLE_STUCK, TERM_ENABLE_TIMEOUT, TERRAIN_WALL_ENABLE
+scene=random_corridor_easy | 石头=110(大10+小100,静态) | 树=开 | 地形=height | 路线=直线(出生x(6.0, 6.0)/y(3.0, 9.0) -> 目标x30.0)
+相机读取: depth=开 rgb=关 | 感知降频=每4步 | 模式=MPPI | FMM每步(约50Hz),MPPI每4步,世界记忆=关
+BEV建图=开 ROI起始=0.55 台阶判据=关 记忆融合=关 | FMM代价=双层(硬半径0.20m,软距离0.65m,权重4.0) | 速度调制=开(最低0.25m/s,2.0→0.7m) | 横向符号-1 俯角0° 近距掩蔽0.00m | 转向锁存=障碍区开(阈值0.05,保持40步),空地死区0.02rad
+障碍白名单=关(掩膜半径0.80m,刹车用原始几何图) | 停滞逃逸=开(窗口30步<0.05m触发,倒退40步@-0.4m/s+转向35步@-0.9rad/s,BEV择空侧,上限6次) | 急转降速档=关 | 指令重采样=1e+06s(1e6=已禁止底层随机覆盖) | 相机跟随=关 | VIO=ideal(σxy=0.000m,σyaw=0.00deg,延迟0步,丢帧0.0%)
+Setting seed: 1
+[legged_robot] 静态障碍在创建期随机化: seed=20261005, 大石头=10, 树=2
+'train_cfg' provided -> Ignoring 'name=go2'
+Actor MLP: Sequential(
+  (0): Linear(in_features=64, out_features=512, bias=True)
+  (1): ELU(alpha=1.0)
+  (2): Linear(in_features=512, out_features=256, bias=True)
+  (3): ELU(alpha=1.0)
+  (4): Linear(in_features=256, out_features=128, bias=True)
+  (5): ELU(alpha=1.0)
+  (6): Linear(in_features=128, out_features=12, bias=True)
+)
+Critic MLP: Sequential(
+  (0): Linear(in_features=238, out_features=512, bias=True)
+  (1): ELU(alpha=1.0)
+  (2): Linear(in_features=512, out_features=256, bias=True)
+  (3): ELU(alpha=1.0)
+  (4): Linear(in_features=256, out_features=128, bias=True)
+  (5): ELU(alpha=1.0)
+  (6): Linear(in_features=128, out_features=1, bias=True)
+)
+Estimator: Sequential(
+  (0): Linear(in_features=270, out_features=128, bias=True)
+  (1): ELU(alpha=1.0)
+  (2): Linear(in_features=128, out_features=64, bias=True)
+  (3): ELU(alpha=1.0)
+  (4): Linear(in_features=64, out_features=19, bias=True)
+)
+Loading model from: /home/fabu/HIMLoco/legged_gym/logs/Dec10_20-00-07_/model_1200.pt
+Exported policy as jit script to:  /home/fabu/HIMLoco/legged_gym/logs/rough_go2/exported/policies
+
+===== Trial 1 =====
+随机直线路线: start=(6.00, 4.39), goal=(30.00, 4.39)
+出生点 trial seed: 20261006 | 静态障碍 seed: 20261005
+随机障碍布局: 大石头=10 | 小碎石=100 | 树=2 | hash=2ddbcc6d2210c891 | stones前5=[[21.860000610351562, 1.8300000429153442], [21.1200008392334, 11.529999732971191], [13.319999694824219, 10.630000114440918], [12.600000381469727, 3.569999933242798], [21.520000457763672, 6.039999961853027]] | trees前5=[[18.770000457763672, 0.699999988079071], [14.960000038146973, 2.690000057220459]]
+最终目标估计/真值误差: 0.149 / 0.149 m (阈值 0.150 m)
+✅ Success: reached all waypoints
+Time used: 30.06 seconds
+Total Distance Walked : 24.393 m
+Real Average Speed : 0.811 m/s
+Avg Torque Cost      : 752.642
+Orientation Error     : 0.056 rad
+Angular Vel Error     : 0.568 rad/s
+Command Wz Variation  : 0.0125 rad/s/step
+Command Wz Sign Flips : 20
+Narrow Passage       : 192 steps, min path clearance 0.495 m
+VIO Pose Error       : rms 0.000 m / 0.00 deg, max 0.000 m / 0.00 deg
+Body Contact         : 0 steps, side 0 steps, peak 0.0 N
+📊 Trial 1 实时指标: 进度=100%, 平滑度=0.0335 rad, 平均规划=8.74 ms
+
+========== Evaluation Result ==========
+Total trials : 1
+Successes   : 1
+Success rate: 1.00

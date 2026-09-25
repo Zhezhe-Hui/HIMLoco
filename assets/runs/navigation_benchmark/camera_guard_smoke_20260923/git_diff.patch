@@ -1,0 +1,1083 @@
+diff --git "a/docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md" "b/docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md"
+index e0887c8..7771990 100644
+--- "a/docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md"
++++ "b/docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md"
+@@ -8,15 +8,15 @@ Intel RealSense D435i。研究不采用纯图像到关节动作的端到端方
+ 
+ ```text
+ D435i 深度图 + 机器人位姿
+-        -> 时空融合局部通行地图（第3章）
+-        -> 距离场引导与运动包络局部规划（第4章）
++        -> 局部几何BEV + 距离场/足迹MPPI规划（第3章）
++        -> RGB-D语义几何融合的连续可通行性（第4章）
+         -> HIMLoco 速度跟踪与运动控制
+         -> Go2 实物系统验证（第5章）
+ ```
+ 
+ 核心问题分为两类：
+ 
+-1. 单前视相机存在侧向盲区，障碍离开当前视野后不能被立即遗忘。
++1. 单前视相机存在视野与近距离盲区，必须在可见几何内保证轨迹足迹安全。
+ 2. 原始 FMM 将机器人近似为质点，固定膨胀半径无法同时满足贴边安全与窄通道通行。
+ 
+ ## 2. 六章内容与交付物
+@@ -36,29 +36,27 @@ footprint 与运动包络、HIMLoco 底层控制，以及统一评价指标。
+ 
+ 交付物：符号表、坐标系图、系统数据流、基线算法定义。
+ 
+-### 第3章 基于时空融合的局部通行环境感知
++### 第3章 有限视野下的局部几何建图与平滑运动规划
+ 
+-输入为深度图与机器人位姿，输出四层局部地图：硬障碍层、连续通行代价层、观测置信度
+-层和障碍距离层。主要内容：
++输入为深度图与机器人位姿，输出硬障碍层、连续安全代价和障碍距离场。主要内容：
+ 
+ 1. 深度反投影与 BEV 几何特征，包括高差、坡度、粗糙度和未知区域。
+-2. 带平移和旋转补偿的历史地图对齐。
+-3. 当前观测优先、历史信息衰减、未知区域保守处理的时空融合。
+-4. 相机盲区、深度噪声和位姿误差下的置信度建模。
++2. 硬障碍层与连续软安全代价，避免固定大膨胀封死窄通道。
++3. Go2矩形机身足迹与MPPI短时轨迹包络检测。
++4. 理想VIO与噪声VIO下的导航鲁棒性。
+ 
+-实验只评价感知，不用最终导航成功率掩盖地图问题。指标包括障碍 IoU、漏检率、自由空间
+-误判率、侧向障碍保持率、地图更新耗时和内存占用。
++在地图之上加入矩形机身足迹、FMM走廊和MPPI短时轨迹优化。感知部分单独评价
++障碍 IoU、漏检率和自由空间误判率；系统部分评价成功率、
++侧擦、最小净空、角速度变化、规划耗时和能耗。
+ 
+-### 第4章 基于距离场与运动包络约束的局部规划
++### 第4章 面向复杂地形的视觉可通行性学习
+ 
+-FMM 只提供到目标的全局下降方向，最终可执行速度由安全约束选择。分三阶段实现：
++RGB-D语义与几何特征融合，区分树、石头、草地、台阶和可跨越区域，输出连续通行代价，
++而不是仅输出二值障碍。将第3章几何规划器作为执行后端，与纯深度FMM、几何MPPI和
++ViPlanner/WVN类方法对比。
+ 
+-1. 硬障碍层与软安全代价层，解决固定膨胀半径矛盾。
+-2. Go2 矩形或多圆 footprint 的短时域轨迹展开与碰撞检测。
+-3. 正常跟踪、减速转向、原地调整、窄通道和后退脱困状态管理。
+-
+-指标包括成功率、碰撞率、最小净空、侧擦次数、窄通道通过率、路径长度、到达时间、
+-角速度变化率和单周期规划耗时。
++指标包括可通行性AUC/IoU、危险地形漏检率、连续代价校准误差，以及闭环导航成功率、
++路径效率和碰撞率。
+ 
+ ### 第5章 系统集成与实物部署
+ 
+@@ -66,7 +64,7 @@ FMM 只提供到目标的全局下降方向，最终可执行速度由安全约
+ 接口、安全急停和仿真到实物参数迁移。实物环境包括散落障碍、转角侧障碍、窄通道、
+ 草地、碎石和低矮台阶。
+ 
+-完整系统对比至少包含：单帧地图+原始 FMM、时空地图+原始 FMM、时空地图+改进规划器。
++完整系统对比至少包含：纯深度+原始FMM、纯深度+足迹MPPI、视觉可通行性+足迹MPPI。
+ 
+ ### 第6章 总结与展望
+ 
+@@ -93,14 +91,10 @@ LoGoPlanner 类端到端策略，但不把未完成内容写成本文贡献。
+ 验收标准：原始模式数值行为可恢复；软代价不封死满足硬尺寸要求的通道；开放空间中路径
+ 最小净空高于同硬半径的固定膨胀 FMM；规划耗时满足在线运行要求。
+ 
+-### 阶段 B：修复时空地图坐标补偿
+-
+-当前 `BEV_ENABLE_MEMORY_FUSION=False`。已有实现只根据世界位移平移机器人坐标系栅格，
+-未处理机器人 yaw 变化，原地转向时会把同一障碍重复写入多个方向并逐渐填满地图。
++### 阶段 B：VIO位姿源与噪声鲁棒性（已完成链路）
+ 
+-计划：使用当前帧到上一帧的 SE(2) 相对变换，通过逆向采样完成历史栅格旋转和平移；
+-分别维护占据概率、观测置信度和年龄；增加转弯盲区合成实验。修复和单测通过前不得开启
+-默认记忆融合。
++仿真真值定义为理想VIO，并在上层规划输入注入位置噪声、航向噪声、随机游走、延迟与丢帧。
++实物阶段用D435i的RGB-D+IMU数据驱动VIO软件，并以实测误差重新标定仿真噪声档位。
+ 
+ ### 阶段 C：footprint 轨迹包络
+ 
+@@ -120,16 +114,16 @@ LoGoPlanner 类端到端策略，但不把未完成内容写成本文贡献。
+ 
+ ## 4. 实验矩阵
+ 
+-### 第3章消融
++### 第3章位姿鲁棒性
+ 
+-| 编号 | 单帧 | 平移补偿 | 旋转补偿 | 置信度衰减 |
+-| --- | --- | --- | --- | --- |
+-| P0 | 是 | 否 | 否 | 否 |
+-| P1 | 是 | 是 | 否 | 否 |
+-| P2 | 是 | 是 | 是 | 否 |
+-| P3 | 是 | 是 | 是 | 是 |
++| 编号 | 位姿输入 | 用途 |
++| --- | --- | --- |
++| P0 | 仿真真值（理想VIO） | 方法上限 |
++| P1 | mild噪声VIO | 轻度误差 |
++| P2 | medium噪声VIO | 常规压力测试 |
++| P3 | severe噪声VIO | 失效边界 |
+ 
+-### 第4章消融
++### 第3章规划消融
+ 
+ | 编号 | 方法 | 用途 |
+ | --- | --- | --- |
+@@ -139,6 +133,16 @@ LoGoPlanner 类端到端策略，但不把未完成内容写成本文贡献。
+ | M3 | M2 + footprint 轨迹预测 | 阶段 C 核心方法 |
+ | M4 | M3 + 状态管理与安全过滤 | 完整方法 |
+ 
++### 2023年以后外部对比
++
++| 方法 | 出处 | 实验定位 |
++| --- | --- | --- |
++| [iPlanner](https://github.com/leggedrobotics/iPlanner) | RSS 2023 | 第3章单深度局部规划主对比 |
++| [ArtPlanner](https://github.com/leggedrobotics/art_planner) | Field Robotics 2023 | 可选的2.5D高程图规划对比 |
++| [ViPlanner](https://github.com/leggedrobotics/viplanner) | ICRA 2024 | 第4章语义几何视觉规划主对比 |
++| [Wild Visual Navigation](https://github.com/leggedrobotics/wild_visual_navigation) | RSS 2023 | 第4章自监督可通行性主对比 |
++| [FDM](https://github.com/leggedrobotics/fdm) | RSS 2025 | 最新学习动力学+MPPI参考，非当前必做基线 |
++
+ 场景至少包括中央障碍、双障碍 S 弯、侧向目标与侧障碍、0.5 至 1.0 m 不同宽度通道、
+ U 形区域和坡地/碎石/台阶混合环境。
+ 
+@@ -163,8 +167,6 @@ LD_LIBRARY_PATH=/home/fabu/miniconda3/envs/himloco/lib:${LD_LIBRARY_PATH:-} \
+ PYTHONPATH=/home/fabu/HIMLoco/legged_gym:/home/fabu/HIMLoco/libraries/isaacgym/python \
+ /home/fabu/miniconda3/envs/himloco/bin/python \
+ legged_gym/legged_gym/scripts/experiment_fmm_cost_layers.py
+-```
+-
+ 对应回归测试：
+ 
+ ```bash
+@@ -400,7 +402,7 @@ python legged_gym/legged_gym/scripts/play1.py --task=go2
+ 
+ 新增方法由三部分组成：
+ 
+-1. 世界坐标稀疏障碍记忆：仅在新深度帧到达时，把白名单障碍由机器人坐标变换到世界
++1. 世界坐标稀疏障碍记忆：仅在新深度帧到达时，把深度BEV障碍由机器人坐标变换到世界
+    坐标哈希体素；每个控制步再按完整SE(2)位姿投影回当前BEV。记忆寿命1秒、体素0.10 m。
+ 2. Go2矩形动态包络：MPPI候选轨迹不再只检查中心点，而是对0.72 m×0.42 m机身/腿部
+    包络外加0.05 m安全边界，在每个预测状态采样完整周界，显式检测机身侧擦。
+@@ -451,3 +453,152 @@ python legged_gym/legged_gym/scripts/play1.py --task=go2
+ 只有阶段 A 的单测和离线实验通过，才运行 Isaac Gym 小样本。小样本先使用三个固定种子，
+ 确认无配置错误、无路径循环和无明显性能回退，再扩大到每组 30 至 50 次。阶段 A 的仿真
+ 完成后进入阶段 B，不同时修改地图记忆与 footprint，以免无法判断提升来自哪个模块。
++
++## 8. 2026-09-23 正式对比实验开工记录
++
++### 8.1 关闭规划器真值白名单
++
++此前 `BEV_OBSTACLE_ACTORS_ONLY=True` 会读取 Isaac Gym actor 的精确世界位置，
++并只保留石头和树附近的深度占据格。它适合诊断边界墙误检，但属于仿真神谕，
++不能作为视觉导航方法的输入。
++
++本次修改：
++
++1. `BEV_OBSTACLE_ACTORS_ONLY` 默认改为 `False`，正式规划链只使用深度生成的 BEV。
++2. 仅保留 `HIMLOCO_ACTOR_WHITELIST=1` 诊断开关；该模式数据不得用于论文统计。
++3. 在原地形四周加入 6 m 平坦缓冲带，外侧仍保留 4 m 安全墙。
++   随机走廊坐标和障碍物分布不变，但边界墙不再进入横向 6 m 的局部 BEV。
++4. 增加回归断言，保证 `random_corridor` 默认关闭真值白名单，且缓冲带
++   不小于 BEV 横向半径。
++
++验证状态：已完成。空平地视觉链全程 `occ=0`，1/1到达，说明外墙已离开局部BEV；
++固定窄门在白名单关闭时仍1/1到达，最终误差0.146 m，平均规划耗时7.70 ms，
++证明石头由深度BEV而非actor真值检出。
++
++### 8.2 理想VIO与位姿噪声注入
++
++新增 `simulated_vio.py`，将仿真真值显式定义为 `ideal`，并提供 `mild/medium/severe`
++三档可复现噪声。模型包含xy和yaw白噪声、随机游走漂移、帧延迟和丢帧保持。
++导航目标变换、世界坐标障碍记忆和FMM/MPPI均使用VIO位姿；真值只评价最终物理误差。
++
++固定窄门单轮链路验证：
++
++| VIO档位 | 结果 | 位置/航向RMS | 转向符号翻转 | 平均规划 |
++| --- | --- | ---: | ---: | ---: |
++| ideal | 成功，真值误差0.150 m | 0.000 m / 0.00° | 14 | 7.91 ms |
++| medium | VIO误到达，估计0.140 m、真值0.160 m | 0.105 m / 1.36° | 48 | 7.62 ms |
++
++`medium` 的一次失败不是成功率结论，但证明真值已与规划链解耦，且噪声会影响
++到达准确度与指令平滑性。三档参数暂为压力测试值，实物部署后必须用D435i+VIO实测轨迹
++重新标定。
++
++### 8.3 侧向盲区场景与记忆负结果
++
++新增 `side_blind_turn`：机器人先沿石头边缘前进，再做90°左转，石头在转弯中离开前视视场。
++同时新增机身接触步数、横向接触步数和峰值接触力评价。
++
++| 方法 | 结果 | 用时 | 逃逸 | 侧向接触 |
++| --- | --- | ---: | ---: | ---: |
++| 关闭记忆 | 成功 | 15.20 s | 0 | 0 |
++| 原记忆 | 成功 | 20.66 s | 2 | 0 |
++| 自由空间清除后的记忆 | 成功 | 19.84 s | 2 | 0 |
++
++该场景目前不能证明记忆降低侧擦，因为无记忆组也没有接触。原记忆只会写入和超时，
++不会利用新深度帧的自由空间清除旧体素，已补上该逻辑及2项单测。下一步应扫描障碍物相对位置，
++用训练seed选出确实会发生侧擦的场景，然后冻结几何参数并在30个未见seed上配对比。
++
++### 8.4 固定seed批量评测基础设施
++
++新增 `run_navigation_benchmark.py`，每个seed启动独立Isaac Gym进程，解决GPU PhysX静态障碍物
++不能在reset后重排的限制。每轮保存配置、原始日志、结构化JSON和聚合CSV。字段包含成功/失败原因、
++路程和用时、规划耗时均值/P95、平滑度、角速度翻转、能耗、净空、接触与VIO误差。
++
++单seed基础设施冒烟输出：
++`assets/runs/navigation_benchmark/smoke_20260923/`。结果为空场景FMM成功，
++19.08 s、19.64 m，平均/P95规划6.70/10.56 ms，机身接触0，且JSON明确记录
++`actor_truth_whitelist=false`。
++
++30个固定seed正式命令（在 `/home/fabu/HIMLoco/legged_gym` 执行）：
++
++```bash
++python legged_gym/scripts/run_navigation_benchmark.py \
++  --scene random_corridor \
++  --methods fmm_fixed fmm_soft mppi astar_dwa \
++  --seed-start 20261000 --num-seeds 30 --vio ideal
++```
++
++正式30-seed实验尚未启动：必须先完成侧盲区场景筛选并冻结参数，避免用测试seed调参。
++
++### 8.5 时序记忆去留决策
++
++使用训练筛选seed `20260930..20260934` 对无记忆MPPI与有记忆MPPI做5对独立进程实验。
++原始JSON、日志和CSV位于 `assets/runs/navigation_benchmark/memory_screen_20260923/`。
++
++| 指标 | 无记忆MPPI | 有记忆MPPI |
++| --- | ---: | ---: |
++| 成功率 | 3/5 | 3/5 |
++| 总侧向接触步数 | 1 | 0 |
++| 成功样本平均用时 | 35.66 s | 37.99 s |
++| 成功样本平均转向翻转 | 22.0 | 26.3 |
++| 成功样本平均规划耗时 | 9.36 ms | 9.40 ms |
++
++配对结果并不稳定：记忆在seed `20260932`救回一次无记忆失败，但在seed `20260930`
++把原本成功的轨迹变成了6次脱困后仍卡住。它可能降低偶发侧擦，但没有提高总成功率，
++并带来更长用时和更多转向翻转。
++
++决策：`TEMPORAL_MEMORY_ENABLE` 默认改为 `False`，时序记忆不再作为论文核心贡献或正式
++MPPI链路的组成部分。代码暂保留，仅用 `HIMLOCO_TEMPORAL_MEMORY=1` 复现负消融。
++正式方法名称为 `mppi`；负消融名称为 `mppi_memory`。
++
++### 8.6 无记忆MPPI脱困复测与四方法冒烟
++
++时序记忆关闭后，对训练seed `20260931..20260933` 复测无记忆MPPI，并将停滞恢复改为：
++倒退0.8 s后，比较当前BEV左右近场占据量，优先向占据更少的一侧转向。三轮结果为2/3成功：
++
++| seed | 结果 | 用时 | 路程 | 逃逸 | 机身/侧向接触步数 |
++| --- | --- | ---: | ---: | ---: | ---: |
++| 20260931 | 成功 | 34.52 s | 24.46 m | 0 | 0 / 0 |
++| 20260932 | 成功 | 35.30 s | 25.02 m | 0 | 0 / 0 |
++| 20260933 | 超时 | 60.00 s | 16.12 m | 6 | 0 / 0 |
++
++seed `20260933` 在旧逻辑中40.54 s发生机身接触后失败，新逻辑避免了接触但仍陷入局部极小值，
++因此只能解释为安全性改善，不能宣称成功率提升。seed `20260932` 本轮成功但没有触发逃逸，
++也不能归因于新恢复动作。原始结果位于
++`assets/runs/navigation_benchmark/escape_bev_screen_20260923/`。
++
++随后使用seed `20260931`完成四方法链路冒烟，所有方法均关闭时序记忆和actor真值白名单：
++
++| 方法 | 结果 | 用时 | 路程 | 平均规划耗时 | 角速度变化 | 逃逸 |
++| --- | --- | ---: | ---: | ---: | ---: | ---: |
++| 固定膨胀FMM | 卡住 | 53.88 s | 20.74 m | 6.79 ms | 0.0286 | 6 |
++| 软代价FMM | 成功 | 41.54 s | 25.83 m | 6.87 ms | 0.0288 | 1 |
++| 足迹MPPI | 成功 | 34.56 s | 24.53 m | 9.37 ms | 0.0123 | 0 |
++| A*+DWA | 成功 | 30.56 s | 24.50 m | 11.45 ms | 0.0057 | 0 |
++
++单seed中A*+DWA优于MPPI，故将其保留为强传统基线，不能预设本文方法胜出。批处理脚本现会在
++每轮结束后自动更新 `trials.csv`、`summary.csv` 和 `summary.json`；效率与平滑性只统计成功样本，
++碰撞和逃逸统计全部样本。原始冒烟结果位于
++`assets/runs/navigation_benchmark/four_method_smoke_20260923/`。
++
++### 8.7 无效批次定位与实验变量解耦
++
++首次正式批次曾误在批处理命令中加入 `--headless`。本项目的Isaac Gym在该模式下设置
++`graphics_device_id=-1`，相机创建返回 `-1` 并被置为 `cam_handle=None`，视觉BEV因此恒为0。
++两个seed的四种方法全部表现为 `narrow_steps=0`、6次逃逸后卡住，恰好是无视觉输入的症状。
++这8轮以及随后同样以headless运行的flat试验均为无效数据，不得进入论文统计。它们保留在
++`assets/runs/navigation_benchmark/formal_30seed_20260923/` 和
++`flat_causal_smoke_20260923/`，仅用于审计错误来源。
++
++批处理已恢复为不传 `--headless`，并增加相机不可用防呆：日志出现
++`headless 下无法创建相机` 时，将该轮标记为 `camera_unavailable` 并立即终止整批，防止再次
++静默产生无视觉数据。此前记忆消融和四方法冒烟运行于这次错误改动之前，相机正常，结果有效。
++
++同时保留两个用途明确的场景，以便后续控制变量：
++
++1. `random_corridor_flat`：随机石头、树、出生点和目标不变，地面改为平地。用于第三章
++   FMM/软代价/MPPI/DWA规划器消融，评价避障成功率、侧擦、路径和平滑度。
++2. `random_corridor`：保留离散高度。用于第五章系统综合实验，评价视觉规划与HIMLoco
++   运动控制组合后的总成功率，并将地形卡滞单列为失败类别。
++
++该拆分用于分别回答“规划器能否避障”和“完整系统能否跨地形并避障”，
++避免用一个总成功率掩盖失败来源。
+diff --git a/legged_gym/legged_gym/envs/go2/go2_config.py b/legged_gym/legged_gym/envs/go2/go2_config.py
+index 5993c40..4e83c41 100644
+--- a/legged_gym/legged_gym/envs/go2/go2_config.py
++++ b/legged_gym/legged_gym/envs/go2/go2_config.py
+@@ -120,7 +120,8 @@ class Go2RoughCfg( LeggedRobotCfg ):
+         mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
+         horizontal_scale = 0.10 # [m] 小砖块地形需要更细的 heightfield 分辨率
+         vertical_scale = 0.005 # [m]
+-        border_size = 0 # [m]
++        border_size = VIZ.TERRAIN_BORDER_SIZE_M # [m]，把外墙移出局部视觉范围
++        border_ground_height_m = VIZ.TERRAIN_BORDER_GROUND_HEIGHT_M
+         curriculum = False
+         static_friction = 1.0
+         dynamic_friction = 1.0
+diff --git a/legged_gym/legged_gym/envs/go2/mppi_local_planner.py b/legged_gym/legged_gym/envs/go2/mppi_local_planner.py
+index 104428b..c640a1e 100644
+--- a/legged_gym/legged_gym/envs/go2/mppi_local_planner.py
++++ b/legged_gym/legged_gym/envs/go2/mppi_local_planner.py
+@@ -8,6 +8,25 @@ def _wrap_angle(angle):
+     return (angle + np.pi) % (2.0 * np.pi) - np.pi
+ 
+ 
++def choose_safer_turn_sign(occ_local, preferred_wz=0.0):
++    """Choose +1 (left) or -1 (right) from near-field occupancy."""
++    occ = np.asarray(occ_local, dtype=np.uint8)
++    if occ.ndim != 2 or occ.size == 0:
++        return 1 if float(preferred_wz) >= 0.0 else -1
++    h, w = occ.shape
++    center = w // 2
++    near = occ[:max(1, h // 2)]
++    right_count = int(np.count_nonzero(near[:, :center]))
++    left_count = int(np.count_nonzero(near[:, center + 1:]))
++    if left_count < right_count:
++        return 1
++    if right_count < left_count:
++        return -1
++    if abs(float(preferred_wz)) > 1e-3:
++        return 1 if float(preferred_wz) > 0.0 else -1
++    return 1
++
++
+ class WorldObstacleMemory:
+     """Sparse world-aligned obstacle memory projected into the current BEV."""
+ 
+@@ -30,11 +49,35 @@ class WorldObstacleMemory:
+         return (int(np.round(x_w / self.voxel_size_m)),
+                 int(np.round(y_w / self.voxel_size_m)))
+ 
+-    def update(self, occ_local, pose_xy_yaw, step):
++    def update(self, occ_local, pose_xy_yaw, step, observed_local=None):
+         occ = np.asarray(occ_local, dtype=np.uint8)
+         if occ.shape != (self.H, self.W):
+             raise ValueError("occ_local shape does not match memory BEV")
+ 
++        # Clear stale voxels only where the current depth frame explicitly observed
++        # free space. Cells outside the camera frustum remain unknown and keep memory.
++        if observed_local is not None and self._voxels:
++            observed = np.asarray(observed_local, dtype=bool)
++            if observed.shape != (self.H, self.W):
++                raise ValueError("observed_local shape does not match memory BEV")
++            free_observed = observed & (occ == 0)
++            keys = np.asarray(list(self._voxels.keys()), dtype=np.float64)
++            x_w = keys[:, 0] * self.voxel_size_m
++            y_w = keys[:, 1] * self.voxel_size_m
++            x, y, yaw = map(float, pose_xy_yaw)
++            cy, sy = math.cos(yaw), math.sin(yaw)
++            dx, dy = x_w - x, y_w - y
++            rows = np.floor((cy * dx + sy * dy) / self.bev_res).astype(np.int32)
++            cols = np.floor(
++                (-sy * dx + cy * dy) / self.bev_res + self.W * 0.5
++            ).astype(np.int32)
++            inside = ((rows >= 0) & (rows < self.H)
++                      & (cols >= 0) & (cols < self.W))
++            clear = np.zeros(keys.shape[0], dtype=bool)
++            clear[inside] = free_observed[rows[inside], cols[inside]]
++            for key in map(tuple, keys[clear].astype(np.int64)):
++                self._voxels.pop(key, None)
++
+         rows, cols = np.nonzero(occ)
+         if rows.size:
+             x_r = (rows.astype(np.float64) + 0.5) * self.bev_res
+diff --git a/legged_gym/legged_gym/envs/go2/pathplanner.py b/legged_gym/legged_gym/envs/go2/pathplanner.py
+index 585663a..4c95cae 100644
+--- a/legged_gym/legged_gym/envs/go2/pathplanner.py
++++ b/legged_gym/legged_gym/envs/go2/pathplanner.py
+@@ -1,5 +1,6 @@
+ from legged_gym import LEGGED_GYM_ROOT_DIR
+ import os
++import json
+ import time
+ import isaacgym
+ from legged_gym.envs import *
+@@ -18,7 +19,9 @@ from legged_gym.envs.go2.a_star_dwa_planner import AStarDWAController
+ from legged_gym.envs.go2.mppi_local_planner import (
+     FootprintMPPIController,
+     WorldObstacleMemory,
++    choose_safer_turn_sign,
+ )
++from legged_gym.envs.go2.simulated_vio import SimulatedVIO, wrap_angle
+ 
+ # =====================================================================
+ #  所有可视化 / 截图 / 出图开关已统一迁移到 viz_config.py
+@@ -260,6 +263,16 @@ class Evaluator:
+         )
+         self._use_temporal_memory = bool(
+             TEMPORAL_MEMORY_ENABLE and self.mode == 'mppi')
++        self.vio = SimulatedVIO(
++            dt=float(self.env.dt),
++            position_sigma_m=VIO_POSITION_SIGMA_M,
++            yaw_sigma_rad=VIO_YAW_SIGMA_RAD,
++            position_drift_m_sqrt_s=VIO_POSITION_DRIFT_M_SQRT_S,
++            yaw_drift_rad_sqrt_s=VIO_YAW_DRIFT_RAD_SQRT_S,
++            latency_steps=VIO_LATENCY_STEPS,
++            dropout_probability=VIO_DROPOUT_PROBABILITY,
++            seed=SCENE_RANDOM_SEED_BASE + VIO_RANDOM_SEED_OFFSET,
++        )
+         # ==================== 加这三行 ====================
+         self.save_trajectory_dir = SAVE_TRAJECTORY_DIR
+         os.makedirs(self.save_trajectory_dir, exist_ok=True)
+@@ -314,6 +327,20 @@ class Evaluator:
+         self.trial_narrow_steps = 0
+         self.trial_min_path_clearance = float("inf")
+         self.trial_memory_max_points = 0
++        initial_true_pose = (
++            float(self.env.root_states[0, 0].item()),
++            float(self.env.root_states[0, 1].item()),
++            float(self._get_base_yaw(0)),
++        )
++        self.vio.reset(
++            initial_true_pose,
++            seed=int(SCENE_RANDOM_SEED_BASE) + int(trial_id) + VIO_RANDOM_SEED_OFFSET)
++        self.trial_vio_position_errors = []
++        self.trial_vio_yaw_errors = []
++        self.trial_false_arrival_error = None
++        self.trial_base_contact_steps = 0
++        self.trial_side_contact_steps = 0
++        self.trial_max_base_contact_force = 0.0
+         # 停滞逃逸状态复位（见 _reset_stall_escape / viz_config.STALL_*）
+         self._reset_stall_escape()
+         # 转向锁存状态复位：不把上一轮的转向惯性带进新一轮
+@@ -351,6 +378,11 @@ class Evaluator:
+             t = step * self.env.dt
+             base_pos = self.env.root_states[0, 0:3].cpu().numpy()
+             base_yaw = self._get_base_yaw(0)
++            nav_pose = self.vio.update((base_pos[0], base_pos[1], base_yaw))
++            nav_x, nav_y, nav_yaw = map(float, nav_pose)
++            self.trial_vio_position_errors.append(float(np.hypot(
++                nav_x - base_pos[0], nav_y - base_pos[1])))
++            self.trial_vio_yaw_errors.append(abs(wrap_angle(nav_yaw - base_yaw)))
+    
+             # ===== A. 时间融合（在 update BEV 之前）=====
+             if BEV_ENABLE_MEMORY_FUSION and prev_base_pos is not None:
+@@ -386,9 +418,12 @@ class Evaluator:
+             else:
+                 occ_bev_now = occ_bev_raw
+             if self._use_temporal_memory:
+-                pose_xy_yaw = (base_pos[0], base_pos[1], base_yaw)
++                pose_xy_yaw = (nav_x, nav_y, nav_yaw)
+                 if fresh_bev:
+-                    self.temporal_memory.update(occ_bev_now, pose_xy_yaw, step)
++                    observed_bev = self.bev.count >= int(BEV_MIN_POINTS)
++                    self.temporal_memory.update(
++                        occ_bev_now, pose_xy_yaw, step,
++                        observed_local=observed_bev)
+                 occ_bev = self.temporal_memory.project(pose_xy_yaw)
+                 self.trial_memory_max_points = max(
+                     self.trial_memory_max_points,
+@@ -398,9 +433,9 @@ class Evaluator:
+ 
+             # 3) 计算 waypoint 在机器人坐标（goal_xy_bev）
+             wp = self.planner.waypoints[self.planner.current_id]
+-            dx_w = wp[0] - base_pos[0]
+-            dy_w = wp[1] - base_pos[1]
+-            c = np.cos(-base_yaw); s = np.sin(-base_yaw)
++            dx_w = wp[0] - nav_x
++            dy_w = wp[1] - nav_y
++            c = np.cos(-nav_yaw); s = np.sin(-nav_yaw)
+             dx_r = c * dx_w - s * dy_w   # forward
+             dy_r = s * dx_w + c * dy_w   # left
+ 
+@@ -421,15 +456,15 @@ class Evaluator:
+ 
+             # ===== 2. FMM路径（robot → world）=====
+             raw_xy = []
+-            cos_yaw = np.cos(base_yaw)
+-            sin_yaw = np.sin(base_yaw)
++            cos_yaw = np.cos(nav_yaw)
++            sin_yaw = np.sin(nav_yaw)
+             for r, col in raw_path:
+                 # BEV → robot frame
+                 x = r * self.fmm.bev_res
+                 y = (col - self.fmm.W // 2) * self.fmm.bev_res
+                 # robot → world
+-                wx = base_pos[0] + cos_yaw * x - sin_yaw * y
+-                wy = base_pos[1] + sin_yaw * x + cos_yaw * y
++                wx = nav_x + cos_yaw * x - sin_yaw * y
++                wy = nav_y + sin_yaw * x + cos_yaw * y
+                 raw_xy.append([wx, wy])
+             raw_xy = np.array(raw_xy)
+             self._record_trial_fmm_segment(step, raw_xy)
+@@ -485,7 +520,7 @@ class Evaluator:
+                     if raw_path else None
+                 print("[start-debug] step=%d yaw=%+.3f goal_robot=(%+.2f,%+.2f) "
+                       "occ=%d reachable=%s lookahead=%s wz=%+.3f"
+-                      % (step, base_yaw, dx_r, dy_r, int(np.count_nonzero(occ_bev)),
++                      % (step, nav_yaw, dx_r, dy_r, int(np.count_nonzero(occ_bev)),
+                          self._planner_reachable, lookahead_point, wz))
+ 
+             # ===== 轨迹优化（仅用于可视化 / 分析 / 未来 MPC）=====
+@@ -517,13 +552,18 @@ class Evaluator:
+             thresh = (NAV_MID_GOAL_REACH_THRESH_M
+                       if self.planner.current_id < n_wp - 1
+                       else NAV_GOAL_REACH_THRESH_M)
+-            # 到达判定必须使用机器人与目标的真实欧氏距离。FMM 场在双层代价模式下是
+-            # 加权 travel time，不再等于几何距离，用它会让到达半径随障碍代价变化。
++            # 规划器按 VIO 估计位姿判断到达；真值距离只用于独立评测，不反馈控制。
++            # FMM 场在双层代价模式下是加权 travel time，不能代替几何距离。
+             goal_distance_m = float(np.hypot(dx_w, dy_w))
++            true_goal_distance_m = float(np.hypot(
++                wp[0] - base_pos[0], wp[1] - base_pos[1]))
+             if goal_distance_m <= float(thresh) or crossed:
+                 if is_final_goal:
+-                    print("最终目标到达误差: %.3f m (阈值 %.3f m)"
+-                          % (goal_distance_m, NAV_GOAL_REACH_THRESH_M))
++                    print("最终目标估计/真值误差: %.3f / %.3f m (阈值 %.3f m)"
++                          % (goal_distance_m, true_goal_distance_m,
++                             NAV_GOAL_REACH_THRESH_M))
++                    if true_goal_distance_m > float(NAV_GOAL_REACH_THRESH_M):
++                        self.trial_false_arrival_error = true_goal_distance_m
+                 if raw_path is not None and len(raw_path) > 1:
+                     # 原来写死 * 0.05，改 bev_res 后路径长度会算错，这里跟着 BEV_RES 走
+                     pts = np.array(raw_path) * BEV_RES
+@@ -564,6 +604,11 @@ class Evaluator:
+                 if self.planner.finished:
+                     self._save_trial_route_plot(trial_id, "success")
+                     self._show_completed_route()
++                    if self.trial_false_arrival_error is not None:
++                        return self._handle_fail(
++                            "VIO false arrival (true error %.3f m)"
++                            % self.trial_false_arrival_error,
++                            elapsed_time)
+                     self.stats["success_count"] += 1
+                     return self._handle_success(elapsed_time)
+                 else:
+@@ -605,7 +650,8 @@ class Evaluator:
+                 self._stall_travel_buf = []
+                 in_escape = False
+             else:
+-                in_escape = self._update_stall_escape(step_dist)
++                in_escape = self._update_stall_escape(
++                    step_dist, occ_bev=occ_bev, preferred_wz=wz)
+             if in_escape and STALL_OVERRIDE_PLANNER:
+                 esc = self._stall_escape_cmd()
+                 if esc is not None:
+@@ -617,6 +663,7 @@ class Evaluator:
+             self.env.commands[0, 2] = wz
+             self._update_live_follow_camera()
+             obs, _, _, dones, infos, _, _ = self.env.step(actions)
++            self._update_contact_metrics()
+             # --- IsaacGym viewer 实时叠加可视化 ---
+             # 节流：LIVE_DRAW_INTERVAL>1 时按间隔重画，省掉大量 add_lines/clear_lines
+             if (LIVE_DRAW_VIEWER_OVERLAY and self.render
+@@ -672,7 +719,7 @@ class Evaluator:
+                     np.save(save_path, traj)
+                     print(f"✅ 轨迹已保存到: {save_path}")
+                 self._save_trial_route_plot(trial_id, "environment_termination")
+-                return self._handle_fail("environment termination", elapsed_time)
++                return self._handle_fail(term_reason, elapsed_time)
+ 
+     def _print_random_obstacle_layout(self):
+         """Print the current trial layout so failed cases can be reproduced and inspected."""
+@@ -698,7 +745,7 @@ class Evaluator:
+         self._stall_escape_count = 0     # 本 trial 已逃逸次数
+         self._stall_turn_sign = 1.0      # 逃逸转向方向（交替用）
+ 
+-    def _update_stall_escape(self, step_dist):
++    def _update_stall_escape(self, step_dist, occ_bev=None, preferred_wz=0.0):
+         """更新停滞检测状态机，返回本步是否处于逃逸中（True 则上层指令被覆盖）。
+ 
+         为什么需要（2026-09-17 停滞取证探针实测，/tmp/pitch/logs/stall_probe.pkl）：
+@@ -743,7 +790,10 @@ class Evaluator:
+         if self._stall_escape_count >= int(STALL_MAX_ESCAPES):
+             return False        # 放弃逃逸，让环境按原逻辑判 timeout/卡住
+         self._stall_escape_count += 1
+-        if STALL_TURN_ALTERNATE:
++        if STALL_TURN_USE_BEV and occ_bev is not None:
++            self._stall_turn_sign = float(choose_safer_turn_sign(
++                occ_bev, preferred_wz=preferred_wz))
++        elif STALL_TURN_ALTERNATE:
+             self._stall_turn_sign = -self._stall_turn_sign
+         self._stall_phase = "reverse"
+         self._stall_phase_left = int(STALL_REVERSE_STEPS)
+@@ -758,7 +808,7 @@ class Evaluator:
+         if self._stall_phase == "reverse":
+             return float(STALL_REVERSE_VX), 0.0
+         if self._stall_phase == "turn":
+-            return 0.0, float(STALL_TURN_WZ) * float(self._stall_turn_sign)
++            return 0.0, abs(float(STALL_TURN_WZ)) * float(self._stall_turn_sign)
+         return None
+ 
+     def _set_trial_follow_camera(self):
+@@ -1903,6 +1953,7 @@ class Evaluator:
+         print(f"Command Wz Variation  : {metrics['cmd_wz_variation']:.4f} rad/s/step")
+         print(f"Command Wz Sign Flips : {metrics['cmd_wz_sign_flips']}")
+         self._print_narrow_passage_stats()
++        self._write_trial_result(False, reason, elapsed_time, metrics)
+         return False, elapsed_time
+     
+     def _handle_success(self, elapsed_time):
+@@ -1918,8 +1969,62 @@ class Evaluator:
+         print(f"Command Wz Variation  : {metrics['cmd_wz_variation']:.4f} rad/s/step")
+         print(f"Command Wz Sign Flips : {metrics['cmd_wz_sign_flips']}")
+         self._print_narrow_passage_stats()
++        self._write_trial_result(True, "success", elapsed_time, metrics)
+         return True, elapsed_time
+ 
++    def _write_trial_result(self, success, reason, elapsed_time, metrics):
++        if not RESULT_JSON_PATH:
++            return
++        pos = np.asarray(self.trial_vio_position_errors, dtype=np.float64)
++        yaw = np.asarray(self.trial_vio_yaw_errors, dtype=np.float64)
++        plan = np.asarray(self.trial_step_times, dtype=np.float64)
++        smooth = np.asarray(self.trial_step_smoothness, dtype=np.float64)
++        record = {
++            "success": bool(success),
++            "failure_reason": str(reason),
++            "scene": ACTIVE_SCENE_PRESET,
++            "scene_seed": int(SCENE_RANDOM_SEED_BASE),
++            "planner_mode": self.mode,
++            "temporal_memory": bool(self._use_temporal_memory),
++            "soft_cost": bool(FMM_USE_SOFT_COST),
++            "actor_truth_whitelist": bool(BEV_OBSTACLE_ACTORS_ONLY),
++            "vio_noise_level": VIO_NOISE_LEVEL,
++            "elapsed_s": float(elapsed_time),
++            "distance_m": float(self.trial_real_distance),
++            "planning_mean_ms": float(plan.mean()) if plan.size else 0.0,
++            "planning_p95_ms": float(np.percentile(plan, 95)) if plan.size else 0.0,
++            "path_smoothness_mean": float(smooth.mean()) if smooth.size else None,
++            "energy_torque_sq_mean": float(metrics["energy"]),
++            "cmd_wz_variation": float(metrics["cmd_wz_variation"]),
++            "cmd_wz_sign_flips": int(metrics["cmd_wz_sign_flips"]),
++            "orientation_error_rad": float(metrics["orientation_error"]),
++            "angular_vel_error_rad_s": float(metrics["angular_vel_error"]),
++            "narrow_steps": int(self.trial_narrow_steps),
++            "min_path_clearance_m": (
++                float(self.trial_min_path_clearance)
++                if np.isfinite(self.trial_min_path_clearance) else None),
++            "memory_max_voxels": int(self.trial_memory_max_points),
++            "body_contact_steps": int(self.trial_base_contact_steps),
++            "side_contact_steps": int(self.trial_side_contact_steps),
++            "peak_body_contact_n": float(self.trial_max_base_contact_force),
++            "vio_position_rms_m": (
++                float(np.sqrt(np.mean(pos ** 2))) if pos.size else 0.0),
++            "vio_yaw_rms_deg": (
++                float(np.rad2deg(np.sqrt(np.mean(yaw ** 2)))) if yaw.size else 0.0),
++            "false_arrival_true_error_m": (
++                float(self.trial_false_arrival_error)
++                if self.trial_false_arrival_error is not None else None),
++            "final_x_m": float(self.env.root_states[0, 0].item()),
++            "final_y_m": float(self.env.root_states[0, 1].item()),
++            "waypoint_progress": float(
++                self.planner.current_id / max(1, len(self.planner.waypoints))),
++            "stall_escape_count": int(self._stall_escape_count),
++        }
++        output_path = os.path.abspath(RESULT_JSON_PATH)
++        os.makedirs(os.path.dirname(output_path), exist_ok=True)
++        with open(output_path, "w", encoding="utf-8") as fh:
++            json.dump(record, fh, ensure_ascii=False, indent=2, sort_keys=True)
++
+     def _print_narrow_passage_stats(self):
+         clearance = self.trial_min_path_clearance
+         clearance_text = "n/a" if not np.isfinite(clearance) else "%.3f m" % clearance
+@@ -1928,6 +2033,39 @@ class Evaluator:
+         if self._use_temporal_memory:
+             print("Temporal Memory      : max %d world voxels"
+                   % self.trial_memory_max_points)
++        if self.trial_vio_position_errors:
++            pos = np.asarray(self.trial_vio_position_errors, dtype=np.float64)
++            yaw = np.asarray(self.trial_vio_yaw_errors, dtype=np.float64)
++            print("VIO Pose Error       : rms %.3f m / %.2f deg, max %.3f m / %.2f deg"
++                  % (float(np.sqrt(np.mean(pos ** 2))),
++                     float(np.rad2deg(np.sqrt(np.mean(yaw ** 2)))),
++                     float(np.max(pos)), float(np.rad2deg(np.max(yaw)))))
++        print("Body Contact         : %d steps, side %d steps, peak %.1f N"
++              % (self.trial_base_contact_steps, self.trial_side_contact_steps,
++                 self.trial_max_base_contact_force))
++
++    def _update_contact_metrics(self):
++        """Record simulator contact truth for evaluation only, never for planning."""
++        try:
++            indices = self.env.termination_contact_indices
++            if indices.numel() == 0:
++                return
++            forces = self.env.contact_forces[0, indices, :]
++            magnitude = torch.norm(forces, dim=-1)
++            peak = float(magnitude.max().item())
++            self.trial_max_base_contact_force = max(
++                self.trial_max_base_contact_force, peak)
++            threshold = float(getattr(
++                getattr(self.env.cfg, "termination", None),
++                "collision_force_threshold", 1.0))
++            if bool(torch.any(magnitude > threshold)):
++                self.trial_base_contact_steps += 1
++            horizontal = torch.norm(forces[:, :2], dim=-1)
++            if bool(torch.any(horizontal > threshold)):
++                self.trial_side_contact_steps += 1
++        except Exception:
++            # Metrics must never alter navigation behavior.
++            return
+ 
+ 
+     def _get_base_yaw(self, env_id=0):
+diff --git a/legged_gym/legged_gym/envs/go2/viz_config.py b/legged_gym/legged_gym/envs/go2/viz_config.py
+index 5a27616..9e21a7c 100644
+--- a/legged_gym/legged_gym/envs/go2/viz_config.py
++++ b/legged_gym/legged_gym/envs/go2/viz_config.py
+@@ -5,9 +5,9 @@ go2 可视化与输出统一配置
+ 把 play.py / play1.py / pathplanner.py 里散落的所有开关集中到这一个文件。
+ 改开关只需编辑本文件，不必再去动 play.py 或 pathplanner.py。
+ 
+-【手动运行命令】以下命令均从仓库根目录执行，可直接复制到终端。
++【手动运行命令】以下命令均从 legged_gym 工作目录执行，可直接复制到终端。
+ 
+-    cd /home/fabu/HIMLoco
++    cd /home/fabu/HIMLoco/legged_gym
+     conda activate himloco
+     export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+ 
+@@ -49,10 +49,19 @@ go2 可视化与输出统一配置
+     HIMLOCO_PLANNER_MODE=fmm         # FMM 基线，用于 A/B 对照
+     HIMLOCO_NUM_TRIALS=10            # 本进程实验次数；肉眼查看建议设为 1
+     HIMLOCO_SCENE_SEED=20260922      # 随机种子；A/B 对照必须保持一致
+-    HIMLOCO_TEMPORAL_MEMORY=1        # 1 开启时序障碍记忆，0 关闭做消融
++    HIMLOCO_TEMPORAL_MEMORY=0        # 默认关闭；1 仅用于已否决的记忆负消融
++    HIMLOCO_VIO_NOISE=ideal          # ideal/mild/medium/severe，仿真VIO误差档位
+     HIMLOCO_MPPI_SAMPLES=384         # MPPI 采样数；增大更慢，通常也更稳定
+     HIMLOCO_FMM_SOFT_COST=1          # FMM 使用连续安全代价；0 为硬膨胀基线
+     HIMLOCO_DEBUG_START_STEPS=30     # 输出起步阶段调试日志；0 表示关闭
++    HIMLOCO_ACTOR_WHITELIST=1        # 仅诊断；使用actor真值，论文实验严禁开启
++
++【侧向盲区记忆消融】同一场景分别运行：
++    HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=side_blind_turn HIMLOCO_PLANNER_MODE=mppi HIMLOCO_TEMPORAL_MEMORY=0 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
++    HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=side_blind_turn HIMLOCO_PLANNER_MODE=mppi HIMLOCO_TEMPORAL_MEMORY=1 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
++
++【30个固定seed批量实验】每个seed独立进程，避免静态碰撞体无法重排：
++    python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor --methods fmm_fixed fmm_soft mppi astar_dwa --seed-start 20261000 --num-seeds 30 --vio ideal
+ 
+     # 单行写法示例（效果与多行命令相同）：
+     HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=narrow_gate HIMLOCO_PLANNER_MODE=mppi HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
+@@ -75,6 +84,7 @@ go2 可视化与输出统一配置
+ 因此这里的名字就是原来那些模块级常量，行为完全兼容。
+ """
+ 
++import math
+ import os
+ 
+ from legged_gym import LEGGED_GYM_ROOT_DIR
+@@ -504,6 +514,8 @@ NUM_ENVS = 1
+ #:   HIMLOCO_NUM_TRIALS=3 python play1.py --task=go2
+ #: 注意：本项目在 --headless 下不创建深度相机，视觉导航实验不能添加该参数。
+ NUM_TRIALS = int(os.environ.get("HIMLOCO_NUM_TRIALS", "10"))
++#: 单进程结构化结果输出。批量脚本为每个 seed 指定独立 JSON 文件。
++RESULT_JSON_PATH = os.environ.get("HIMLOCO_RESULT_JSON", "").strip()
+ NAV_EPISODE_LENGTH_S = 60.0  #: 24m 随机走廊含绕障，30~45s 容易把正常绕行误判超时
+ RENDER = True           #: 是否开 IsaacGym viewer 窗口
+ PLANNER_MODE = os.environ.get("HIMLOCO_PLANNER_MODE", "mppi").strip().lower()
+@@ -731,6 +743,10 @@ TERRAIN_ROUGH_DOWNSAMPLE = 0.2
+ #: 离散障碍高度的 difficulty 换算
+ TERRAIN_DISCRETE_OBSTACLE_BASE = 0.05
+ TERRAIN_DISCRETE_OBSTACLE_SCALE = 0.1
++#: 地形主体四周的平坦缓冲带。路线仍使用原世界坐标，缓冲带把仿真边界墙移到
++#: 相机/局部 BEV 之外，避免依赖 actor 真值白名单过滤墙体。
++TERRAIN_BORDER_SIZE_M = 6.0
++TERRAIN_BORDER_GROUND_HEIGHT_M = 0.0
+ #: 地形边界墙（防止机器人跑出地图）
+ TERRAIN_WALL_ENABLE = True
+ TERRAIN_WALL_THICKNESS_M = 1.0
+@@ -778,6 +794,11 @@ SCENE_BLOCKER_TWO_POSITIONS = [
+ SCENE_NARROW_GATE_POSITIONS = [
+     (16.0, 4.6905), (16.0, 6.3905),
+ ]
++# 侧向盲区：机器人沿 +x 从石头右侧经过，随后在石头前方左转。
++# 转弯时石头会离开前视相机，但仍落在机身旋转包络附近。
++SCENE_SIDE_BLIND_TURN_POSITIONS = [
++    (14.20, 6.65),
++]
+ SCENE_BLOCKER_STONE_POSITIONS = [
+     (8.0, 8.6), (9.5, 8.3),      # seg0→1
+     (12.6, 6.4), (13.8, 5.2),    # seg1→2
+@@ -853,6 +874,18 @@ SCENE_PRESETS = {
+         SPAWN_RANDOM_X_RANGE=(6.0, 6.0),
+         SPAWN_RANDOM_Y_RANGE=(6.0, 6.0),
+     ),
++    # 时序记忆专用消融：同一 seed 分别以 HIMLOCO_TEMPORAL_MEMORY=0/1 运行。
++    "side_blind_turn": dict(
++        SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
++        SCENE_NUM_SMALL_STONES=0, SCENE_ENABLE_TREES=False,
++        SCENE_TERRAIN_PRESET="flat", SCENE_STONE_LAYOUT="side_blind_turn",
++        SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=False,
++        NAV_RANDOM_STRAIGHT_ROUTE=False,
++        WAYPOINTS=[(14.80, 6.00), (14.80, 11.00)],
++        SPAWN_RANDOMIZE_EACH_TRIAL=True,
++        SPAWN_RANDOM_X_RANGE=(6.0, 6.0),
++        SPAWN_RANDOM_Y_RANGE=(6.0, 6.0),
++    ),
+     # 同上但保留树（更接近野外，代价是构建变慢、显存变高）
+     "blocker_trees": dict(
+         SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
+@@ -869,6 +902,16 @@ SCENE_PRESETS = {
+         NAV_RANDOM_STRAIGHT_ROUTE=True,
+         SPAWN_RANDOMIZE_EACH_TRIAL=True,
+     ),
++    # 第三章规划器消融：随机石头、树和路线不变，只移除会导致底层步态
++    # 独立卡滞的离散高度。粗糙地形与规划器组合留到第五章系统实验。
++    "random_corridor_flat": dict(
++        SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
++        SCENE_NUM_SMALL_STONES=0, SCENE_ENABLE_TREES=True,
++        SCENE_TERRAIN_PRESET="flat", SCENE_STONE_LAYOUT="random_corridor",
++        SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
++        NAV_RANDOM_STRAIGHT_ROUTE=True,
++        SPAWN_RANDOMIZE_EACH_TRIAL=True,
++    ),
+     # ⚡ 调试/回归专用：关掉大树 + 大小石头，但【保留 custom 地形】。
+     #   与 "empty" 的区别：empty 会把地形换成平地，导航路线就没意义了；
+     #   这个只砍掉障碍物，地形、出生点、waypoints 全部不变，
+@@ -994,6 +1037,8 @@ def resolve_stone_layout(layout=None):
+         return list(SCENE_BLOCKER_TWO_POSITIONS)
+     if layout == "narrow_gate":
+         return list(SCENE_NARROW_GATE_POSITIONS)
++    if layout == "side_blind_turn":
++        return list(SCENE_SIDE_BLIND_TURN_POSITIONS)
+     if layout == "random_corridor":
+         # 这里只提供 actor 数量；legged_robot 在 PhysX actor 创建前按 seed 重新采样。
+         # GPU pipeline 启动后不能移动静态碰撞体，因此同一进程内布局保持不变。
+@@ -1065,6 +1110,14 @@ def check_consistency(verbose=True):
+         problems.append("MPPI 机身足迹长宽必须 > 0")
+     if TEMPORAL_MEMORY_MAX_AGE_STEPS < 1:
+         problems.append("TEMPORAL_MEMORY_MAX_AGE_STEPS 必须 >= 1")
++    if VIO_LATENCY_STEPS < 0:
++        problems.append("VIO_LATENCY_STEPS 必须 >= 0")
++    if not 0.0 <= VIO_DROPOUT_PROBABILITY < 1.0:
++        problems.append("VIO_DROPOUT_PROBABILITY 必须位于 [0, 1)")
++    if BEV_OBSTACLE_ACTORS_ONLY:
++        notes.append(
++            "HIMLOCO_ACTOR_WHITELIST=1：规划器正在使用仿真 actor 真值；"
++            "该模式仅供诊断，不得用于论文实验")
+     if abs(CAM_HORIZONTAL_FOV - BEV_HFOV_DEG) > 1e-6:
+         problems.append(
+             "CAM_HORIZONTAL_FOV(%s) 必须等于 BEV_HFOV_DEG(%s)，否则深度图反投影到 BEV 会错位"
+@@ -1508,8 +1561,9 @@ BEV_ENABLE_UPDATE = True
+ #:   ⚠ 2026-09-17 实测：BEV 判据不区分来源，no_obstacles 场景里仍稳定检出 ~55 格，
+ #:     世界坐标聚类全在 terrain 边界墙（4m 高，起点距左墙 2.4m，在 BEV ±3m 内），
+ #:     FMM 常年往右推，观感像“在绕地形离散障碍”。地形凸起 hr≈0.01m 本就不会被检出。
+-#:   True = 只绕 actor（用户语义）；False = 原行为（墙/地形起伏也进障碍图）。
+-BEV_OBSTACLE_ACTORS_ONLY = True
++#:   正式实验必须为 False：actor 位姿是仿真真值，只能用于离线评价，不能进入规划器。
++#:   HIMLOCO_ACTOR_WHITELIST=1 仅供定位深度感知问题，使用该开关的数据不得写入论文结果。
++BEV_OBSTACLE_ACTORS_ONLY = _env_bool("HIMLOCO_ACTOR_WHITELIST", False)
+ #: 每个 actor 的掩膜半径 [m]。大石头 scale=2 实测 footprint 约 1.0~1.2m 宽，
+ #:   取 0.8 留膨胀余量；太小会漏掉石头边缘、太大会把窄廊堵死。
+ BEV_ACTOR_MASK_RADIUS_M = 0.8
+@@ -1542,14 +1596,42 @@ BEV_CLEARANCE_USE_RAW_MAP = True
+ BEV_ENABLE_MEMORY_FUSION = False
+ BEV_MEMORY_MAX_AGE = 30         #: 记忆寿命 [帧]，约 1 秒（dt≈0.03）
+ 
+-# ---------- 世界坐标时序障碍记忆（MPPI方法）----------
++# ---------- 世界坐标时序障碍记忆（仅保留作负消融）----------
+ #: 与上面的旧机器人坐标栅格记忆不同，本模块保存世界坐标障碍点，并按当前完整
+ #: SE(2) 位姿重投影；因此原地转向不会把同一障碍重复涂满局部地图。
+-TEMPORAL_MEMORY_ENABLE = _env_bool("HIMLOCO_TEMPORAL_MEMORY", True)
++#: 5个配对训练seed中，开关两组均为3/5成功；记忆会救回一个困难seed，也会让另一个
++#: 原本成功的seed保守卡死，且成功样本平均更慢。因此不作为默认方法或论文贡献。
++TEMPORAL_MEMORY_ENABLE = _env_bool("HIMLOCO_TEMPORAL_MEMORY", False)
+ TEMPORAL_MEMORY_MAX_AGE_STEPS = 50    #: 50 Hz 下保留 1 秒，覆盖转身盲区且限制边缘累积
+ TEMPORAL_MEMORY_VOXEL_M = 0.10
+ TEMPORAL_MEMORY_MAX_POINTS = 12000
+ 
++# ---------- 仿真 VIO 位姿源 ----------
++#: ideal 使用仿真真值作为“理想 VIO”；其余档位只作用于上层建图、目标变换和规划。
++#: actor 真值、碰撞和最终物理误差仍只由评测器读取，不反馈给规划器。
++VIO_NOISE_PRESETS = {
++    "ideal":  (0.00, 0.0, 0.000, 0.0, 0, 0.00),
++    "mild":   (0.01, 0.5, 0.005, 0.1, 1, 0.00),
++    "medium": (0.03, 1.0, 0.015, 0.3, 2, 0.01),
++    "severe": (0.05, 2.0, 0.030, 0.6, 4, 0.05),
++}
++VIO_NOISE_LEVEL = os.environ.get("HIMLOCO_VIO_NOISE", "ideal").strip().lower()
++if VIO_NOISE_LEVEL not in VIO_NOISE_PRESETS:
++    raise ValueError("HIMLOCO_VIO_NOISE=%r 不受支持，可选 %s"
++                     % (VIO_NOISE_LEVEL, sorted(VIO_NOISE_PRESETS)))
++(_vio_pos_sigma, _vio_yaw_sigma_deg, _vio_pos_drift,
++ _vio_yaw_drift_deg, _vio_latency, _vio_dropout) = VIO_NOISE_PRESETS[VIO_NOISE_LEVEL]
++VIO_POSITION_SIGMA_M = _env_float("HIMLOCO_VIO_POS_SIGMA_M", _vio_pos_sigma)
++VIO_YAW_SIGMA_RAD = math.radians(_env_float(
++    "HIMLOCO_VIO_YAW_SIGMA_DEG", _vio_yaw_sigma_deg))
++VIO_POSITION_DRIFT_M_SQRT_S = _env_float(
++    "HIMLOCO_VIO_POS_DRIFT_M_SQRT_S", _vio_pos_drift)
++VIO_YAW_DRIFT_RAD_SQRT_S = math.radians(_env_float(
++    "HIMLOCO_VIO_YAW_DRIFT_DEG_SQRT_S", _vio_yaw_drift_deg))
++VIO_LATENCY_STEPS = _env_int("HIMLOCO_VIO_LATENCY_STEPS", _vio_latency)
++VIO_DROPOUT_PROBABILITY = _env_float("HIMLOCO_VIO_DROPOUT", _vio_dropout)
++VIO_RANDOM_SEED_OFFSET = 700000
++
+ # ---------- FMM 梯度跟随（本文方法）----------
+ FMM_MAX_WZ = 1.0                #: 角速度上限 [rad/s]
+ FMM_YAW_K = 2.0                 #: 期望方向角 -> wz 的比例增益
+@@ -1705,11 +1787,14 @@ STALL_MIN_TRAVEL_M = 0.05       #: 窗口内路程低于该值算停滞 [m]
+ #: 逃逸动作：先倒退，再原地转，各持续若干步。
+ #:   倒退是四足脱困的标准手法（离开卡住脚的那个坑洼），
+ #:   之后原地转把朝向换一个方向，避开刚才走不通的那条线。
+-STALL_REVERSE_STEPS = 25        #: 倒退步数（0.5s）
++STALL_REVERSE_STEPS = 40        #: 倒退步数（0.8s），确保机身退出局部卡点/障碍包络
+ STALL_REVERSE_VX = -0.4         #: 倒退速度 [m/s]（负值）
+ STALL_TURN_STEPS = 35           #: 原地转向步数（0.7s）
+-STALL_TURN_WZ = -0.9            #: 逃逸转向角速度 [rad/s]（符号由 STALL_TURN_ALTERNATE 决定）
++STALL_TURN_WZ = -0.9            #: 逃逸转向角速度 [rad/s]（实际符号由下方策略决定）
++#: 优先比较机器人左右近场的占据量，转向障碍更少的一侧；平局沿用规划器当前转向。
++STALL_TURN_USE_BEV = True
+ #: 每次逃逸交替转向方向（True）还是固定方向（False）。交替可避免反复转回同一个死锁位。
++#: 仅在 STALL_TURN_USE_BEV=False 或没有可用 BEV 时作为回退策略。
+ STALL_TURN_ALTERNATE = True
+ #: 逃逸期间忽略 FMM 的 wz 与速度调制，直接用逃逸指令（必须如此，否则上层会把它拉回去）。
+ STALL_OVERRIDE_PLANNER = True
+@@ -2091,7 +2176,8 @@ def summary():
+             STALL_WINDOW_STEPS, STALL_MIN_TRAVEL_M,
+             STALL_REVERSE_STEPS, STALL_REVERSE_VX,
+             STALL_TURN_STEPS, STALL_TURN_WZ,
+-            ",交替方向" if STALL_TURN_ALTERNATE else ",固定方向",
++            (",BEV择空侧" if STALL_TURN_USE_BEV else
++             (",交替方向" if STALL_TURN_ALTERNATE else ",固定方向")),
+             STALL_MAX_ESCAPES)
+         if STALL_ESCAPE_ENABLE else "关")
+     new_state = (
+@@ -2106,6 +2192,10 @@ def summary():
+             "开" if LIVE_FOLLOW_VIEWER_CAMERA else "关",
+         )
+     )
+-    return "preset=%s | 已开启: %s\n%s\n相机读取: %s | %s\n%s\n%s" % (
++    vio_state = ("VIO=%s(σxy=%.3fm,σyaw=%.2fdeg,延迟%d步,丢帧%.1f%%)" % (
++        VIO_NOISE_LEVEL, VIO_POSITION_SIGMA_M,
++        math.degrees(VIO_YAW_SIGMA_RAD), VIO_LATENCY_STEPS,
++        100.0 * VIO_DROPOUT_PROBABILITY))
++    return "preset=%s | 已开启: %s\n%s\n相机读取: %s | %s\n%s\n%s | %s" % (
+         ACTIVE_PRESET, ", ".join(on) if on else "无", scene_summary(),
+-        cam_state, percept + " | " + planner_rate, nav_state, new_state)
++        cam_state, percept + " | " + planner_rate, nav_state, new_state, vio_state)
+diff --git a/legged_gym/legged_gym/tests/test_mppi_local_planner.py b/legged_gym/legged_gym/tests/test_mppi_local_planner.py
+index ce02cbb..7f4448d 100644
+--- a/legged_gym/legged_gym/tests/test_mppi_local_planner.py
++++ b/legged_gym/legged_gym/tests/test_mppi_local_planner.py
+@@ -6,6 +6,7 @@ import numpy as np
+ from legged_gym.envs.go2.mppi_local_planner import (
+     FootprintMPPIController,
+     WorldObstacleMemory,
++    choose_safer_turn_sign,
+ )
+ 
+ 
+@@ -40,6 +41,51 @@ class WorldObstacleMemoryTest(unittest.TestCase):
+         memory.update(np.zeros_like(occ), (1.0, 0.0, 0.0), step=4)
+         self.assertEqual(memory.point_count, 0)
+ 
++    def test_reobserved_free_space_clears_ghost_obstacle(self):
++        memory = WorldObstacleMemory(
++            bev_res=0.1, bev_x=6.0, bev_y=6.0,
++            max_age_steps=20, voxel_size_m=0.1)
++        occ = np.zeros((60, 60), dtype=np.uint8)
++        occ[20, 30] = 1
++        memory.update(occ, (0.0, 0.0, 0.0), step=0)
++
++        observed = np.zeros_like(occ, dtype=bool)
++        observed[20, 30] = True
++        memory.update(
++            np.zeros_like(occ), (0.0, 0.0, 0.0), step=1,
++            observed_local=observed)
++
++        self.assertEqual(memory.point_count, 0)
++
++    def test_unobserved_space_keeps_obstacle_memory(self):
++        memory = WorldObstacleMemory(
++            bev_res=0.1, bev_x=6.0, bev_y=6.0,
++            max_age_steps=20, voxel_size_m=0.1)
++        occ = np.zeros((60, 60), dtype=np.uint8)
++        occ[20, 30] = 1
++        memory.update(occ, (0.0, 0.0, 0.0), step=0)
++        memory.update(
++            np.zeros_like(occ), (0.0, 0.0, 0.0), step=1,
++            observed_local=np.zeros_like(occ, dtype=bool))
++
++        self.assertEqual(memory.point_count, 1)
++
++
++class EscapeDirectionTest(unittest.TestCase):
++    def test_turns_toward_side_with_less_occupancy(self):
++        occ = np.zeros((60, 60), dtype=np.uint8)
++        occ[:30, 31:] = 1
++        self.assertEqual(choose_safer_turn_sign(occ), -1)
++
++        occ.fill(0)
++        occ[:30, :30] = 1
++        self.assertEqual(choose_safer_turn_sign(occ), 1)
++
++    def test_equal_occupancy_uses_planner_turn(self):
++        occ = np.zeros((60, 60), dtype=np.uint8)
++        self.assertEqual(choose_safer_turn_sign(occ, preferred_wz=-0.4), -1)
++        self.assertEqual(choose_safer_turn_sign(occ, preferred_wz=0.4), 1)
++
+ 
+ class FootprintMPPITest(unittest.TestCase):
+     def make_controller(self, **kwargs):
+diff --git a/legged_gym/legged_gym/tests/test_random_corridor.py b/legged_gym/legged_gym/tests/test_random_corridor.py
+index 633fdc7..be80664 100644
+--- a/legged_gym/legged_gym/tests/test_random_corridor.py
++++ b/legged_gym/legged_gym/tests/test_random_corridor.py
+@@ -20,6 +20,14 @@ class RandomCorridorTest(unittest.TestCase):
+             viz_config.SCENE_RANDOM_CORRIDOR_BIG_STONE_COUNT)
+         self.assertGreater(viz_config.SCENE_NUM_BIG_STONES, 0)
+         self.assertEqual(viz_config.SCENE_TERRAIN_PRESET, "height")
++        self.assertFalse(viz_config.BEV_OBSTACLE_ACTORS_ONLY)
++        self.assertFalse(viz_config.TEMPORAL_MEMORY_ENABLE)
++        self.assertGreaterEqual(
++            viz_config.TERRAIN_BORDER_SIZE_M,
++            0.5 * viz_config.BEV_Y)
++        self.assertEqual(
++            Go2RoughCfg.terrain.border_size,
++            viz_config.TERRAIN_BORDER_SIZE_M)
+         self.assertFalse(Go2RoughCfg.stone.randomize_each_reset)
+         self.assertTrue(Go2RoughCfg.stone.randomize_at_creation)
+ 
+@@ -54,6 +62,27 @@ class RandomCorridorTest(unittest.TestCase):
+         np.testing.assert_allclose(first, repeated)
+         self.assertFalse(np.allclose(first, next_scene))
+ 
++    def test_side_blind_turn_preset_is_reproducible(self):
++        preset = viz_config.SCENE_PRESETS["side_blind_turn"]
++        self.assertEqual(preset["SCENE_STONE_LAYOUT"], "side_blind_turn")
++        self.assertFalse(preset["NAV_RANDOM_STRAIGHT_ROUTE"])
++        self.assertEqual(preset["WAYPOINTS"], [(14.80, 6.00), (14.80, 11.00)])
++        self.assertEqual(
++            viz_config.resolve_stone_layout("side_blind_turn"),
++            viz_config.SCENE_SIDE_BLIND_TURN_POSITIONS)
++
++    def test_flat_planner_scene_only_changes_terrain(self):
++        rough = viz_config.SCENE_PRESETS["random_corridor"]
++        flat = viz_config.SCENE_PRESETS["random_corridor_flat"]
++        self.assertEqual(rough["SCENE_STONE_LAYOUT"], flat["SCENE_STONE_LAYOUT"])
++        self.assertEqual(
++            rough["SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL"],
++            flat["SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL"])
++        self.assertEqual(rough["NAV_RANDOM_STRAIGHT_ROUTE"],
++                         flat["NAV_RANDOM_STRAIGHT_ROUTE"])
++        self.assertEqual(rough["SCENE_TERRAIN_PRESET"], "height")
++        self.assertEqual(flat["SCENE_TERRAIN_PRESET"], "flat")
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/legged_gym/legged_gym/utils/terrain.py b/legged_gym/legged_gym/utils/terrain.py
+index 9c40138..b05b947 100644
+--- a/legged_gym/legged_gym/utils/terrain.py
++++ b/legged_gym/legged_gym/utils/terrain.py
+@@ -56,8 +56,12 @@ class Terrain:
+         self.border = int(cfg.border_size/self.cfg.horizontal_scale)
+         self.tot_cols = int(cfg.num_cols * self.width_per_env_pixels) + 2 * self.border
+         self.tot_rows = int(cfg.num_rows * self.length_per_env_pixels) + 2 * self.border
+-        self.height_field_raw = np.full((self.tot_rows, self.tot_cols), -1000, dtype=np.int16)
+-        # self.height_field_raw = np.zeros((self.tot_rows , self.tot_cols), dtype=np.int16)
++        border_ground_m = float(getattr(cfg, "border_ground_height_m", 0.0))
++        border_ground_px = int(round(border_ground_m / cfg.vertical_scale))
++        # border_size 是可行走缓冲带，不应沿用旧的 -5m 深坑初始化。外侧仍由
++        # add_all_walls() 封闭，地形主体随后会覆盖中央区域。
++        self.height_field_raw = np.full(
++            (self.tot_rows, self.tot_cols), border_ground_px, dtype=np.int16)
+         if cfg.curriculum:
+             self.curiculum()
+         elif cfg.selected:

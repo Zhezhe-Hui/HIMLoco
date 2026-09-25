@@ -1,0 +1,33 @@
+[
+  {
+    "method": "mppi",
+    "trials": 1,
+    "successes": 1,
+    "success_rate": 1.0,
+    "failure_reasons": "{}",
+    "elapsed_s_mean": 31.319999299943447,
+    "elapsed_s_std": 0.0,
+    "distance_m_mean": 24.079554621348507,
+    "distance_m_std": 0.0,
+    "planning_time_ms_mean": 8.616234591300882,
+    "planning_time_ms_std": 0.0,
+    "planning_p95_ms_mean": 21.0508108139038,
+    "planning_p95_ms_std": 0.0,
+    "path_smoothness_mean": 0.03991176820139285,
+    "path_smoothness_std": 0.0,
+    "cmd_wz_variation_mean": 0.009723868705661257,
+    "cmd_wz_variation_std": 0.0,
+    "cmd_wz_sign_flips_mean": 18.0,
+    "cmd_wz_sign_flips_std": 0.0,
+    "energy_torque_sq_mean": 690.4593505859375,
+    "energy_torque_sq_std": 0.0,
+    "body_contact_steps_mean": 0.0,
+    "body_contact_steps_std": 0.0,
+    "side_contact_steps_mean": 0.0,
+    "side_contact_steps_std": 0.0,
+    "stall_escape_count_mean": 0.0,
+    "stall_escape_count_std": 0.0,
+    "min_path_clearance_m_mean": 0.3201562166213989,
+    "min_path_clearance_m_std": 0.0
+  }
+]
