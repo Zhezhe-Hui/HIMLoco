@@ -28,6 +28,7 @@
     "stall_escape_count_mean": 2.0,
     "stall_escape_count_std": 2.8284271247461903,
     "min_path_clearance_m_mean": 0.4294901192188263,
-    "min_path_clearance_m_std": 0.06548461318016052
+    "min_path_clearance_m_std": 0.06548461318016052,
+    "method_display_name": "双层代价FMM引导的足迹MPPI"
   }
 ]

@@ -20,6 +20,17 @@ EFFICIENCY_METRICS = (
     "min_path_clearance_m",
 )
 
+METHOD_DISPLAY_NAMES = {
+    "fmm_fixed": "固定膨胀FMM",
+    "fmm_soft": "双层代价FMM",
+    "mppi": "双层代价FMM引导的足迹MPPI",
+    "mppi_memory": "时序记忆+双层代价FMM引导的足迹MPPI",
+    "astar_dwa": "A*+DWA",
+    "sapf": "SAPF",
+    "ps_dwa": "PS-DWA",
+    "iplanner": "iPlanner",
+}
+
 
 def wilson_interval(successes, trials, z=1.959963984540054):
     if trials <= 0:
@@ -37,7 +48,11 @@ def exact_mcnemar_p(reference_only, other_only):
     discordant = reference_only + other_only
     if discordant == 0:
         return 1.0
-    tail = sum(math.comb(discordant, k) for k in range(
+    # math.comb was added in Python 3.8; Isaac Gym here uses Python 3.7.
+    def combination(n, k):
+        return math.factorial(n) // (math.factorial(k) * math.factorial(n - k))
+
+    tail = sum(combination(discordant, k) for k in range(
         min(reference_only, other_only) + 1)) / float(2 ** discordant)
     return min(1.0, 2.0 * tail)
 
@@ -105,6 +120,7 @@ def analyze(records, reference="mppi"):
             categories[category] = categories.get(category, 0) + 1
         row = {
             "method": method,
+            "method_display_name": METHOD_DISPLAY_NAMES.get(method, method),
             "trials": len(method_records),
             "successes": len(successes),
             "success_rate": len(successes) / float(len(method_records)),
@@ -115,7 +131,7 @@ def analyze(records, reference="mppi"):
         for metric in EFFICIENCY_METRICS:
             values = [float(record[metric]) for record in successes
                       if isinstance(record.get(metric), (int, float))]
-            row[metric + "_mean"] = statistics.fmean(values) if values else None
+            row[metric + "_mean"] = statistics.mean(values) if values else None
             row[metric + "_std"] = statistics.pstdev(values) if len(values) > 1 else (
                 0.0 if values else None)
         method_stats.append(row)
@@ -160,9 +176,9 @@ def analyze(records, reference="mppi"):
                 p_value = None
             comparison["metrics"][metric] = {
                 "n": len(pairs),
-                "reference_mean": statistics.fmean(reference_values),
-                "other_mean": statistics.fmean(other_values),
-                "mean_difference": statistics.fmean(
+                "reference_mean": statistics.mean(reference_values),
+                "other_mean": statistics.mean(other_values),
+                "mean_difference": statistics.mean(
                     ref - candidate for ref, candidate in pairs),
                 "wilcoxon_p": p_value,
             }
@@ -183,6 +199,7 @@ def write_outputs(analysis, root):
     for item in analysis["methods"]:
         table.append({
             "method": item["method"],
+            "method_display_name": item["method_display_name"],
             "successes": item["successes"],
             "trials": item["trials"],
             "success_rate": item["success_rate"],
@@ -204,11 +221,19 @@ def write_outputs(analysis, root):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("directory", type=Path)
+    parser.add_argument(
+        "--additional-directory", type=Path, action="append", default=[],
+        help="load paired methods from another result directory without rerunning them")
     parser.add_argument("--reference", default="mppi")
     args = parser.parse_args()
     records = load_trials(args.directory)
+    for directory in args.additional_directory:
+        records.extend(load_trials(directory))
     if not records:
         raise RuntimeError("no *_seed*.json trials found")
+    keys = [(record["method"], record["seed"]) for record in records]
+    if len(keys) != len(set(keys)):
+        raise ValueError("duplicate method+seed records across input directories")
     analysis = analyze(records, reference=args.reference)
     write_outputs(analysis, args.directory)
     print(json.dumps(analysis, ensure_ascii=False, indent=2))

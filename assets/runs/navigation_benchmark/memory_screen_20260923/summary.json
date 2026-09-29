@@ -28,7 +28,8 @@
     "stall_escape_count_mean": null,
     "stall_escape_count_std": null,
     "min_path_clearance_m_mean": 0.35808802644411725,
-    "min_path_clearance_m_std": 0.051051943764529706
+    "min_path_clearance_m_std": 0.051051943764529706,
+    "method_display_name": "mppi_full"
   },
   {
     "method": "mppi_no_memory",
@@ -59,6 +60,7 @@
     "stall_escape_count_mean": null,
     "stall_escape_count_std": null,
     "min_path_clearance_m_mean": 0.42774810393651325,
-    "min_path_clearance_m_std": 0.053524688478537266
+    "min_path_clearance_m_std": 0.053524688478537266,
+    "method_display_name": "mppi_no_memory"
   }
 ]

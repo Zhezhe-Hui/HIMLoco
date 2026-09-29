@@ -27,7 +27,8 @@
       "energy_torque_sq_mean_mean": 754.3972981770834,
       "energy_torque_sq_mean_std": 7.285513178343203,
       "min_path_clearance_m_mean": null,
-      "min_path_clearance_m_std": null
+      "min_path_clearance_m_std": null,
+      "method_display_name": "A*+DWA"
     },
     {
       "method": "fmm_fixed",
@@ -55,7 +56,8 @@
       "energy_torque_sq_mean_mean": 658.0355113636364,
       "energy_torque_sq_mean_std": 30.785352290429014,
       "min_path_clearance_m_mean": 0.25495097041130066,
-      "min_path_clearance_m_std": 0.0
+      "min_path_clearance_m_std": 0.0,
+      "method_display_name": "固定膨胀FMM"
     },
     {
       "method": "fmm_soft",
@@ -83,7 +85,8 @@
       "energy_torque_sq_mean_mean": 682.140390249399,
       "energy_torque_sq_mean_std": 17.382685534374513,
       "min_path_clearance_m_mean": 0.4017236209832705,
-      "min_path_clearance_m_std": 0.05337510139738747
+      "min_path_clearance_m_std": 0.05337510139738747,
+      "method_display_name": "双层代价FMM"
     },
     {
       "method": "mppi",
@@ -110,7 +113,8 @@
       "energy_torque_sq_mean_mean": 689.7722206115723,
       "energy_torque_sq_mean_std": 43.45303312601643,
       "min_path_clearance_m_mean": 0.4074910916388035,
-      "min_path_clearance_m_std": 0.06285705347330857
+      "min_path_clearance_m_std": 0.06285705347330857,
+      "method_display_name": "双层代价FMM引导的足迹MPPI"
     }
   ],
   "paired": [

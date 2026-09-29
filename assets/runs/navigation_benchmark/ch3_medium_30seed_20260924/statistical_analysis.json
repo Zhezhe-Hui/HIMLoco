@@ -1,0 +1,213 @@
+{
+  "reference": "mppi",
+  "paired_layout_hashes_verified": true,
+  "methods": [
+    {
+      "method": "fmm_fixed",
+      "trials": 30,
+      "successes": 10,
+      "success_rate": 0.3333333333333333,
+      "success_ci95_low": 0.19230498083676134,
+      "success_ci95_high": 0.5121994835545616,
+      "failure_categories": {
+        "success": 10,
+        "stuck": 14,
+        "timeout": 5,
+        "collision": 1
+      },
+      "elapsed_s_mean": 45.953998972848055,
+      "elapsed_s_std": 8.18521111547956,
+      "distance_m_mean": 26.882890039034102,
+      "distance_m_std": 1.5085080101203423,
+      "cmd_wz_variation_mean": 0.026662457744803345,
+      "cmd_wz_variation_std": 0.001871586029393387,
+      "cmd_wz_sign_flips_mean": 26.0,
+      "cmd_wz_sign_flips_std": 5.118593556827891,
+      "planning_mean_ms_mean": 4.370411398351492,
+      "planning_mean_ms_std": 1.1723954145912054,
+      "energy_torque_sq_mean_mean": 708.7440063476563,
+      "energy_torque_sq_mean_std": 57.4477966275415,
+      "min_path_clearance_m_mean": 0.25495097041130066,
+      "min_path_clearance_m_std": 0.0,
+      "method_display_name": "固定膨胀FMM"
+    },
+    {
+      "method": "fmm_soft",
+      "trials": 30,
+      "successes": 10,
+      "success_rate": 0.3333333333333333,
+      "success_ci95_low": 0.19230498083676134,
+      "success_ci95_high": 0.5121994835545616,
+      "failure_categories": {
+        "success": 10,
+        "collision": 9,
+        "stuck": 7,
+        "timeout": 4
+      },
+      "elapsed_s_mean": 41.97199906185269,
+      "elapsed_s_std": 7.018148886861552,
+      "distance_m_mean": 27.200670199703563,
+      "distance_m_std": 1.5452160055188877,
+      "cmd_wz_variation_mean": 0.025941161412470173,
+      "cmd_wz_variation_std": 0.0011134479070887848,
+      "cmd_wz_sign_flips_mean": 23.5,
+      "cmd_wz_sign_flips_std": 4.8218253804964775,
+      "planning_mean_ms_mean": 4.163093621741532,
+      "planning_mean_ms_std": 0.8090437858613537,
+      "energy_torque_sq_mean_mean": 749.7862548828125,
+      "energy_torque_sq_mean_std": 44.374580424459204,
+      "min_path_clearance_m_mean": 0.4292639076709747,
+      "min_path_clearance_m_std": 0.0705868548405752,
+      "method_display_name": "双层代价FMM"
+    },
+    {
+      "method": "mppi",
+      "trials": 30,
+      "successes": 20,
+      "success_rate": 0.6666666666666666,
+      "success_ci95_low": 0.4878005164454384,
+      "success_ci95_high": 0.8076950191632386,
+      "failure_categories": {
+        "success": 20,
+        "stuck": 5,
+        "collision": 3,
+        "timeout": 2
+      },
+      "elapsed_s_mean": 41.459999073296785,
+      "elapsed_s_std": 8.225229296233186,
+      "distance_m_mean": 26.33335797147229,
+      "distance_m_std": 1.672895430998579,
+      "cmd_wz_variation_mean": 0.012724474341669578,
+      "cmd_wz_variation_std": 0.0023937822065700914,
+      "cmd_wz_sign_flips_mean": 23.95,
+      "cmd_wz_sign_flips_std": 4.236448984704053,
+      "planning_mean_ms_mean": 6.210628533323456,
+      "planning_mean_ms_std": 1.2931753439477252,
+      "energy_torque_sq_mean_mean": 772.0960235595703,
+      "energy_torque_sq_mean_std": 92.39941221527218,
+      "min_path_clearance_m_mean": 0.44638660848140715,
+      "min_path_clearance_m_std": 0.06699995743022351,
+      "method_display_name": "双层代价FMM引导的足迹MPPI"
+    }
+  ],
+  "paired": [
+    {
+      "reference": "mppi",
+      "other": "fmm_fixed",
+      "reference_only_success": 11,
+      "other_only_success": 1,
+      "common_successes": 9,
+      "mcnemar_exact_p": 0.00634765625,
+      "metrics": {
+        "elapsed_s": {
+          "n": 9,
+          "reference_mean": 39.80444355474578,
+          "other_mean": 46.33333229770263,
+          "mean_difference": -6.52888874295685,
+          "wilcoxon_p": 0.12890625
+        },
+        "distance_m": {
+          "n": 9,
+          "reference_mean": 25.886814637167035,
+          "other_mean": 27.013712112732012,
+          "mean_difference": -1.1268974755649752,
+          "wilcoxon_p": 0.203125
+        },
+        "cmd_wz_variation": {
+          "n": 9,
+          "reference_mean": 0.011444018702548445,
+          "other_mean": 0.026626053197661263,
+          "mean_difference": -0.015182034495112818,
+          "wilcoxon_p": 0.00390625
+        },
+        "cmd_wz_sign_flips": {
+          "n": 9,
+          "reference_mean": 23.0,
+          "other_mean": 26.0,
+          "mean_difference": -3.0,
+          "wilcoxon_p": 0.10603481579165039
+        },
+        "planning_mean_ms": {
+          "n": 9,
+          "reference_mean": 6.497260791317778,
+          "other_mean": 4.432590194108825,
+          "mean_difference": 2.0646705972089534,
+          "wilcoxon_p": 0.00390625
+        },
+        "energy_torque_sq_mean": {
+          "n": 9,
+          "reference_mean": 771.9836832682291,
+          "other_mean": 714.2010430230034,
+          "mean_difference": 57.78264024522569,
+          "wilcoxon_p": 0.09765625
+        },
+        "min_path_clearance_m": {
+          "n": 9,
+          "reference_mean": 0.4340267976125081,
+          "other_mean": 0.25495097041130066,
+          "mean_difference": 0.1790758272012075,
+          "wilcoxon_p": 0.00390625
+        }
+      }
+    },
+    {
+      "reference": "mppi",
+      "other": "fmm_soft",
+      "reference_only_success": 11,
+      "other_only_success": 1,
+      "common_successes": 9,
+      "mcnemar_exact_p": 0.00634765625,
+      "metrics": {
+        "elapsed_s": {
+          "n": 9,
+          "reference_mean": 42.931110151526,
+          "other_mean": 40.631110202935005,
+          "mean_difference": 2.299999948590994,
+          "wilcoxon_p": 0.734375
+        },
+        "distance_m": {
+          "n": 9,
+          "reference_mean": 26.40784254704421,
+          "other_mean": 26.80549080089602,
+          "mean_difference": -0.39764825385181113,
+          "wilcoxon_p": 0.5703125
+        },
+        "cmd_wz_variation": {
+          "n": 9,
+          "reference_mean": 0.012032492798152635,
+          "other_mean": 0.025982703965459937,
+          "mean_difference": -0.0139502111673073,
+          "wilcoxon_p": 0.00390625
+        },
+        "cmd_wz_sign_flips": {
+          "n": 9,
+          "reference_mean": 24.88888888888889,
+          "other_mean": 23.0,
+          "mean_difference": 1.8888888888888888,
+          "wilcoxon_p": 0.3258007162855291
+        },
+        "planning_mean_ms": {
+          "n": 9,
+          "reference_mean": 6.088291517405755,
+          "other_mean": 4.191530199377813,
+          "mean_difference": 1.8967613180279412,
+          "wilcoxon_p": 0.00390625
+        },
+        "energy_torque_sq_mean": {
+          "n": 9,
+          "reference_mean": 779.1284722222222,
+          "other_mean": 737.7879774305555,
+          "mean_difference": 41.340494791666664,
+          "wilcoxon_p": 0.49609375
+        },
+        "min_path_clearance_m": {
+          "n": 9,
+          "reference_mean": 0.4595068660047319,
+          "other_mean": 0.4219627049234178,
+          "mean_difference": 0.03754416108131409,
+          "wilcoxon_p": 0.11585149752593009
+        }
+      }
+    }
+  ]
+}

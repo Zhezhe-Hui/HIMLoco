@@ -1,0 +1,31 @@
+{
+  "scene": "random_corridor_medium",
+  "methods": [
+    "sapf",
+    "ps_dwa",
+    "iplanner"
+  ],
+  "seed_start": 20261000,
+  "num_seeds": 30,
+  "vio": "ideal",
+  "python": "/home/hzz/miniconda3/envs/himloco/bin/python",
+  "git_commit": "b788b3d279119ce3f20af60370cd07513db19f06",
+  "git_dirty": true,
+  "method_provenance": {
+    "sapf": {
+      "paper": "Safe Artificial Potential Field, IEEE RA-L 2023",
+      "implementation": "native NumPy occupancy-grid adaptation from the paper equations",
+      "official_author_code": false
+    },
+    "ps_dwa": {
+      "paper": "PatternSearch-Dynamic Window Approach, AM&A 2025",
+      "implementation": "native Python pattern-search adaptation of the shared A*+DWA baseline",
+      "official_author_code": false
+    },
+    "iplanner": {
+      "paper": "iPlanner: Imperative Path Planning, RSS 2023",
+      "implementation": "official pretrained network and interpolation with a HIMLoco velocity adapter",
+      "official_author_code": true
+    }
+  }
+}

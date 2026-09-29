@@ -17,6 +17,11 @@ from legged_gym.envs.go2.bev_height_mapper import BEVMapper,FMMGradientControlle
 from legged_gym.envs.go2.bev_height_mapper import plot_all_trials,plot_all_saved_trajectories
 from legged_gym.envs.go2.rrt_planner import RRTController
 from legged_gym.envs.go2.a_star_dwa_planner import AStarDWAController
+from legged_gym.envs.go2.paper_baseline_planners import (
+    PatternSearchDWAController,
+    SafeAPFController,
+)
+from legged_gym.envs.go2.iplanner_controller import IPlannerController
 from legged_gym.envs.go2.mppi_local_planner import (
     FootprintMPPIController,
     WorldObstacleMemory,
@@ -246,13 +251,43 @@ class Evaluator:
                 inflate_radius_m=RRT_INFLATE_RADIUS_M,
                 goal_min_forward_m=FMM_GOAL_MIN_FORWARD_M,
             )
-        elif self.mode == 'astar_dwa': # 新增
-            self.fmm = AStarDWAController(
+        elif self.mode in ('astar_dwa', 'ps_dwa'):
+            dwa_class = (PatternSearchDWAController
+                         if self.mode == 'ps_dwa' else AStarDWAController)
+            self.fmm = dwa_class(
                 bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
                 max_vx=DWA_MAX_VX, max_wz=DWA_MAX_WZ,
                 max_acc_vx=DWA_MAX_ACC_VX, max_acc_wz=DWA_MAX_ACC_WZ,
                 dt=DWA_DT, predict_time=DWA_PREDICT_TIME,
                 inflate_radius_m=DWA_INFLATE_RADIUS_M,
+                **({'max_evaluations': PS_DWA_MAX_EVALUATIONS}
+                   if self.mode == 'ps_dwa' else {}),
+            )
+        elif self.mode == 'sapf':
+            self.fmm = SafeAPFController(
+                bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
+                max_vx=SAPF_MAX_VX, max_wz=SAPF_MAX_WZ,
+                yaw_k=SAPF_YAW_K,
+                safe_distance_m=SAPF_SAFE_DISTANCE_M,
+                vortex_distance_m=SAPF_VORTEX_DISTANCE_M,
+                influence_distance_m=SAPF_INFLUENCE_DISTANCE_M,
+                attraction_gain=SAPF_ATTRACTION_GAIN,
+                repulsion_gain=SAPF_REPULSION_GAIN,
+            )
+        elif self.mode == 'iplanner':
+            self.fmm = IPlannerController(
+                model_path=IPLANNER_MODEL_PATH,
+                runtime_dir=IPLANNER_RUNTIME_DIR,
+                bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
+                max_goal_distance_m=IPLANNER_MAX_GOAL_DISTANCE_M,
+                max_vx=IPLANNER_MAX_VX,
+                max_wz=IPLANNER_MAX_WZ,
+                yaw_k=IPLANNER_YAW_K,
+                lookahead_m=IPLANNER_LOOKAHEAD_M,
+                fear_threshold=IPLANNER_FEAR_THRESHOLD,
+                fear_buffer_size=IPLANNER_FEAR_BUFFER_SIZE,
+                fear_speed_m_s=IPLANNER_FEAR_SPEED_M_S,
+                device=IPLANNER_DEVICE,
             )
         else:
             raise ValueError("unknown planner mode: %r" % self.mode)
@@ -287,7 +322,7 @@ class Evaluator:
         self._camera_vis_depth = None
         if SAVE_BEV_FMM_IMAGES:
             os.makedirs(SAVE_BEV_FMM_DIR, exist_ok=True)
-            for subdir in ("height", "obstacles", "potential"):
+            for subdir in ("height", "obstacles", "soft_cost", "potential"):
                 os.makedirs(os.path.join(SAVE_BEV_FMM_DIR, subdir), exist_ok=True)
         if SAVE_TRIAL_ROUTE_IMAGE:
             os.makedirs(SAVE_TRIAL_ROUTE_DIR, exist_ok=True)
@@ -353,6 +388,7 @@ class Evaluator:
         self._mppi_active = False
         self._cached_mppi_cmd = (float(NAV_FORWARD_VX), 0.0)
         self._cached_raw_path = []
+        self._last_depth_pos = None
         self._planner_reachable = True
         self.trial_step_times = []  # 必须初始化，否则 A* 报错
         self.trial_total_length = 0
@@ -442,10 +478,18 @@ class Evaluator:
 
             # 4) FMM：重规划周期独立配置。当前按用户观感恢复到 50Hz；深度图
             # 仍以 12.5Hz 更新，但机器人位姿与局部目标每个控制步都会变化。
-            replan_interval = max(1, int(FMM_REPLAN_INTERVAL_STEPS))
+            if self.mode == 'iplanner':
+                planner_interval = IPLANNER_REPLAN_INTERVAL_STEPS
+            elif self.mode == 'ps_dwa':
+                planner_interval = PS_DWA_REPLAN_INTERVAL_STEPS
+            else:
+                planner_interval = FMM_REPLAN_INTERVAL_STEPS
+            replan_interval = max(1, int(planner_interval))
             plan_due = step == 0 or step % replan_interval == 0
             if plan_due:
                 self.fmm.set_goal((dx_r, dy_r))
+                if self.mode == 'iplanner':
+                    self.fmm.set_depth(self._last_depth_pos)
                 start_plan_t = time.time()
                 self.fmm.update(occ_bev)
                 self.trial_step_times.append((time.time() - start_plan_t) * 1000)
@@ -477,6 +521,8 @@ class Evaluator:
 
             wz = self.fmm.compute_wz()
             planner_vx = None
+            if self.mode in ('sapf', 'ps_dwa', 'iplanner'):
+                planner_vx = self.fmm.compute_vx()
             if self.mppi is not None:
                 obstacle_active = bool(np.any(occ_bev))
                 if obstacle_active:
@@ -1351,7 +1397,9 @@ class Evaluator:
         fig.savefig(save_path, dpi=180, bbox_inches="tight")
         plt.close(fig)
 
-    def _save_bev_fmm_separate_images(self, trial_id, step, hr, obstacle_rgb, potential, occ_bev, path_xy, smooth_xy, extent_m):
+    def _save_bev_fmm_separate_images(self, trial_id, step, hr, obstacle_rgb,
+                                      soft_cost, potential, occ_bev, path_xy,
+                                      smooth_xy, extent_m):
         self._save_bev_fmm_single_panel(
             "height",
             trial_id,
@@ -1370,6 +1418,18 @@ class Evaluator:
             path_xy,
             smooth_xy,
         )
+        if soft_cost is not None:
+            self._save_bev_fmm_single_panel(
+                "soft_cost",
+                trial_id,
+                step,
+                "Soft Cost",
+                lambda ax: ax.imshow(
+                    soft_cost, origin="lower", extent=extent_m, cmap="magma",
+                    vmin=0.0, vmax=1.0, interpolation="nearest", aspect="auto"),
+                path_xy,
+                smooth_xy,
+            )
         if BEV_FMM_SHOW_POTENTIAL:
             def draw_potential(ax):
                 if potential is not None:
@@ -1404,6 +1464,9 @@ class Evaluator:
         path_xy = self._path_rc_to_plot_xy(path_rc)
         smooth_xy = self._smooth_plot_path(path_xy)
         potential = self._format_fmm_potential()
+        soft_cost = getattr(self.fmm, "soft_cost_map", None)
+        if soft_cost is not None:
+            soft_cost = np.asarray(soft_cost, dtype=np.float32)
 
         obstacle_rgb = np.ones((*occ_bev.shape, 3), dtype=np.float32)
         obstacle_rgb[occ_bev > 0] = np.array([0.18, 0.18, 0.18], dtype=np.float32)
@@ -1462,6 +1525,7 @@ class Evaluator:
                 step,
                 hr,
                 obstacle_rgb,
+                soft_cost,
                 potential,
                 occ_bev,
                 path_xy,
@@ -2012,7 +2076,8 @@ class Evaluator:
             "scene_seed": int(SCENE_RANDOM_SEED_BASE),
             "planner_mode": self.mode,
             "temporal_memory": bool(self._use_temporal_memory),
-            "soft_cost": bool(FMM_USE_SOFT_COST),
+            "soft_cost": (bool(FMM_USE_SOFT_COST)
+                          if self.mode in ('fmm', 'mppi') else None),
             "actor_truth_whitelist": bool(BEV_OBSTACLE_ACTORS_ONLY),
             "vio_noise_level": VIO_NOISE_LEVEL,
             "elapsed_s": float(elapsed_time),

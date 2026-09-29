@@ -1,0 +1,4 @@
+﻿method,successes,trials,success_rate,success_ci95_low,success_ci95_high,elapsed_s_mean,distance_m_mean,cmd_wz_variation_mean,planning_mean_ms,failure_categories,method_display_name
+fmm_fixed,10,30,0.3333333333333333,0.19230498083676134,0.5121994835545616,45.953998972848055,26.882890039034102,0.026662457744803345,4.370411398351492,"{""collision"": 1, ""stuck"": 14, ""success"": 10, ""timeout"": 5}",固定膨胀FMM
+fmm_soft,10,30,0.3333333333333333,0.19230498083676134,0.5121994835545616,41.97199906185269,27.200670199703563,0.025941161412470173,4.163093621741532,"{""collision"": 9, ""stuck"": 7, ""success"": 10, ""timeout"": 4}",双层代价FMM
+mppi,20,30,0.6666666666666666,0.4878005164454384,0.8076950191632386,41.459999073296785,26.33335797147229,0.012724474341669578,6.210628533323456,"{""collision"": 3, ""stuck"": 5, ""success"": 20, ""timeout"": 2}",双层代价FMM引导的足迹MPPI

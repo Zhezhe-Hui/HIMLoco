@@ -1,0 +1,19 @@
+{
+  "scene": "random_corridor_easy",
+  "methods": [
+    "iplanner"
+  ],
+  "seed_start": 20261000,
+  "num_seeds": 1,
+  "vio": "ideal",
+  "python": "/home/hzz/miniconda3/envs/himloco/bin/python",
+  "git_commit": "b788b3d279119ce3f20af60370cd07513db19f06",
+  "git_dirty": true,
+  "method_provenance": {
+    "iplanner": {
+      "paper": "iPlanner: Imperative Path Planning, RSS 2023",
+      "implementation": "official pretrained network and interpolation with a HIMLoco velocity adapter",
+      "official_author_code": true
+    }
+  }
+}

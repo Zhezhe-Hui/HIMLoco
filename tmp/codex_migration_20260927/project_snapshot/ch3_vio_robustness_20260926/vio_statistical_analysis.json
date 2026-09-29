@@ -1,0 +1,137 @@
+{
+  "paired_layout_hashes_verified": true,
+  "levels": [
+    {
+      "level": "ideal",
+      "trials": 30,
+      "strict_successes": 17,
+      "strict_success_rate": 0.5666666666666667,
+      "strict_ci95_low": 0.3919730700081361,
+      "strict_ci95_high": 0.7262251442353347,
+      "within_020_count": 17,
+      "within_020_rate": 0.5666666666666667,
+      "false_arrivals": 0,
+      "false_arrival_error_mean_m": null,
+      "false_arrival_error_max_m": null,
+      "vio_position_rms_mean_m": 0.0,
+      "vio_yaw_rms_mean_deg": 0.0,
+      "cmd_wz_variation_success_mean": 0.012997952518792811,
+      "planning_success_mean_ms": 5.713551141938096,
+      "outcomes": {
+        "success": 17,
+        "false_arrival": 0,
+        "collision": 5,
+        "stuck": 7,
+        "timeout": 1,
+        "other": 0
+      }
+    },
+    {
+      "level": "mild",
+      "trials": 30,
+      "strict_successes": 7,
+      "strict_success_rate": 0.23333333333333334,
+      "strict_ci95_low": 0.11792388144489496,
+      "strict_ci95_high": 0.40928326158122164,
+      "within_020_count": 15,
+      "within_020_rate": 0.5,
+      "false_arrivals": 8,
+      "false_arrival_error_mean_m": 0.16812359541654587,
+      "false_arrival_error_max_m": 0.18947872519493103,
+      "vio_position_rms_mean_m": 0.0332497851831198,
+      "vio_yaw_rms_mean_deg": 0.7747845383722527,
+      "cmd_wz_variation_success_mean": 0.017416762236106952,
+      "planning_success_mean_ms": 5.490197323097993,
+      "outcomes": {
+        "success": 7,
+        "false_arrival": 8,
+        "collision": 5,
+        "stuck": 10,
+        "timeout": 0,
+        "other": 0
+      }
+    },
+    {
+      "level": "medium",
+      "trials": 30,
+      "strict_successes": 7,
+      "strict_success_rate": 0.23333333333333334,
+      "strict_ci95_low": 0.11792388144489496,
+      "strict_ci95_high": 0.40928326158122164,
+      "within_020_count": 15,
+      "within_020_rate": 0.5,
+      "false_arrivals": 11,
+      "false_arrival_error_mean_m": 0.202882165258581,
+      "false_arrival_error_max_m": 0.3677607774734497,
+      "vio_position_rms_mean_m": 0.0949843704364726,
+      "vio_yaw_rms_mean_deg": 1.7016664422303907,
+      "cmd_wz_variation_success_mean": 0.020764480062489928,
+      "planning_success_mean_ms": 5.639966918164112,
+      "outcomes": {
+        "success": 7,
+        "false_arrival": 11,
+        "collision": 4,
+        "stuck": 8,
+        "timeout": 0,
+        "other": 0
+      }
+    },
+    {
+      "level": "severe",
+      "trials": 30,
+      "strict_successes": 5,
+      "strict_success_rate": 0.16666666666666666,
+      "strict_ci95_low": 0.0733654237184855,
+      "strict_ci95_high": 0.3356435050641603,
+      "within_020_count": 8,
+      "within_020_rate": 0.26666666666666666,
+      "false_arrivals": 12,
+      "false_arrival_error_mean_m": 0.3001082129776478,
+      "false_arrival_error_max_m": 0.6421298980712891,
+      "vio_position_rms_mean_m": 0.19069092531479268,
+      "vio_yaw_rms_mean_deg": 3.5281412272947366,
+      "cmd_wz_variation_success_mean": 0.024325472211348814,
+      "planning_success_mean_ms": 5.592526008400842,
+      "outcomes": {
+        "success": 5,
+        "false_arrival": 12,
+        "collision": 5,
+        "stuck": 7,
+        "timeout": 1,
+        "other": 0
+      }
+    }
+  ],
+  "paired": [
+    {
+      "reference": "ideal",
+      "other": "mild",
+      "ideal_only_strict": 11,
+      "other_only_strict": 1,
+      "strict_mcnemar_p": 0.00634765625,
+      "ideal_only_within_020": 5,
+      "other_only_within_020": 3,
+      "within_020_mcnemar_p": 0.7265625
+    },
+    {
+      "reference": "ideal",
+      "other": "medium",
+      "ideal_only_strict": 13,
+      "other_only_strict": 3,
+      "strict_mcnemar_p": 0.021270751953125,
+      "ideal_only_within_020": 5,
+      "other_only_within_020": 3,
+      "within_020_mcnemar_p": 0.7265625
+    },
+    {
+      "reference": "ideal",
+      "other": "severe",
+      "ideal_only_strict": 13,
+      "other_only_strict": 1,
+      "strict_mcnemar_p": 0.0018310546875,
+      "ideal_only_within_020": 10,
+      "other_only_within_020": 1,
+      "within_020_mcnemar_p": 0.01171875
+    }
+  ]
+}

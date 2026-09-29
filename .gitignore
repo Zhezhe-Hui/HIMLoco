@@ -74,6 +74,10 @@ assets/runs/*
 # 放行benchmark目录
 !assets/runs/navigation_benchmark/
 !assets/runs/navigation_benchmark/**
+
+# plannernet.pt exceeds GitHub's 100 MiB per-file limit. The repository stores
+# lossless split parts beside it; run restore_plannernet.sh after cloning.
+assets/checkpoints/iplanner/plannernet.pt
 # 覆盖前面的runs忽略规则，放行这个benchmark目录
 !assets/runs/navigation_benchmark/
 !assets/runs/navigation_benchmark/**

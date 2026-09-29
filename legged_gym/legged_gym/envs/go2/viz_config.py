@@ -7,7 +7,7 @@ go2 可视化与输出统一配置
 
 【手动运行命令】以下命令均从 legged_gym 工作目录执行，可直接复制到终端。
 
-    cd /home/fabu/HIMLoco/legged_gym
+    cd /home/hzz/project/HIMLoco/legged_gym
     conda activate himloco
     export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
 
@@ -36,6 +36,10 @@ go2 可视化与输出统一配置
     HIMLOCO_NUM_TRIALS=10 \
     python legged_gym/scripts/play1.py --task=go2
 
+    # 4. 近年论文方法：同一seed分别观察SAPF与PS-DWA。
+    HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=random_corridor_easy HIMLOCO_PLANNER_MODE=sapf HIMLOCO_SCENE_SEED=20261000 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
+    HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=random_corridor_easy HIMLOCO_PLANNER_MODE=ps_dwa HIMLOCO_SCENE_SEED=20261000 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
+
 【常用命令参数】把需要的变量放在 python 命令前；未写的使用本文件默认值。
 
     HIMLOCO_PRESET=viewer_only       # 开窗口观察，不保存论文图片
@@ -49,6 +53,9 @@ go2 可视化与输出统一配置
     HIMLOCO_SCENE_PRESET=empty       # 平地且无障碍，仅检查步态/控制
     HIMLOCO_PLANNER_MODE=mppi        # MPPI 局部规划器（当前推荐）
     HIMLOCO_PLANNER_MODE=fmm         # FMM 基线，用于 A/B 对照
+    HIMLOCO_PLANNER_MODE=sapf        # SAPF安全人工势场
+    HIMLOCO_PLANNER_MODE=ps_dwa      # 模式搜索DWA（A*提供局部参考路径）
+    HIMLOCO_PLANNER_MODE=iplanner    # RSS 2023 iPlanner官方预训练网络
     HIMLOCO_NUM_TRIALS=10            # 本进程实验次数；肉眼查看建议设为 1
     HIMLOCO_SCENE_SEED=20260922      # 随机种子；A/B 对照必须保持一致
     HIMLOCO_TEMPORAL_MEMORY=0        # 默认关闭；1 仅用于已否决的记忆负消融
@@ -66,6 +73,7 @@ go2 可视化与输出统一配置
     python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_easy --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
     python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_medium --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
     python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_hard --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
+    python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_easy --methods sapf ps_dwa --seed-start 20261000 --num-seeds 30 --vio ideal
 
     # 单行写法示例（效果与多行命令相同）：
     HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=narrow_gate HIMLOCO_PLANNER_MODE=mppi HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
@@ -523,7 +531,7 @@ RESULT_JSON_PATH = os.environ.get("HIMLOCO_RESULT_JSON", "").strip()
 NAV_EPISODE_LENGTH_S = 60.0  #: 24m 随机走廊含绕障，30~45s 容易把正常绕行误判超时
 RENDER = True           #: 是否开 IsaacGym viewer 窗口
 PLANNER_MODE = os.environ.get("HIMLOCO_PLANNER_MODE", "mppi").strip().lower()
-#: 高层规划器："fmm"(基线) / "mppi"(FMM走廊+足迹MPPI) / "rrt" / "astar_dwa"
+#: 高层规划器："fmm" / "mppi" / "rrt" / "astar_dwa" / "sapf" / "ps_dwa" / "iplanner"
 #: 导航目标点（世界坐标），论文用的是 4 个点：A/B/C + 终点
 WAYPOINTS = [
     (11.0, 8.0),
@@ -635,7 +643,8 @@ POLICY_EXPERIMENT_NAME = "rough_go2"   #: logs/ 下的实验名（对应 runner.
 #: 留空 = 默认 logs/<experiment_name>；也可填绝对路径的 log_root
 POLICY_LOG_ROOT = os.path.join(LOGS_ROOT, POLICY_EXPERIMENT_NAME)
 #: 该实验下当前唯一训练到 1200 迭代的 run（其余都是 2~60 迭代的冒烟测试）
-POLICY_LOAD_RUN = os.path.join(LOGS_ROOT, "Dec10_20-00-07_")
+POLICY_LOAD_RUN = os.path.join(
+    LOGS_ROOT, "go2_new_reward", "Dec10_20-00-07_")
 #: -1 = 取该 run 里编号最大的 model_*.pt；填数字则取 model_<N>.pt
 POLICY_CHECKPOINT = 1200
 
@@ -1150,7 +1159,7 @@ def check_consistency(verbose=True):
     """
     problems = []
     notes = []
-    if PLANNER_MODE not in ("fmm", "mppi", "rrt", "astar_dwa"):
+    if PLANNER_MODE not in ("fmm", "mppi", "rrt", "astar_dwa", "sapf", "ps_dwa", "iplanner"):
         problems.append("PLANNER_MODE=%r 不受支持" % PLANNER_MODE)
     if MPPI_HORIZON < 2 or MPPI_NUM_SAMPLES < 2:
         problems.append("MPPI_HORIZON 和 MPPI_NUM_SAMPLES 必须都 >= 2")
@@ -1773,6 +1782,41 @@ DWA_DT = 0.1                    #: 预测步长 [s]
 DWA_PREDICT_TIME = 1.2          #: 预测时域 [s]
 DWA_INFLATE_RADIUS_M = 0.25     #: 撞墙时可上调至 0.3
 
+# ---------- 近年论文对比方法（统一 BEV / 底层控制下的本地实现）----------
+# SAPF: Safe Artificial Potential Field, IEEE RA-L 2023。
+SAPF_MAX_VX = 1.0
+SAPF_MAX_WZ = 1.0
+SAPF_YAW_K = 2.0
+SAPF_SAFE_DISTANCE_M = 0.30
+SAPF_VORTEX_DISTANCE_M = 0.70
+SAPF_INFLUENCE_DISTANCE_M = 1.20
+SAPF_ATTRACTION_GAIN = 1.0
+SAPF_REPULSION_GAIN = 0.035
+
+# PS-DWA: Pattern Search Dynamic Window Approach, AM&A 2025。
+# 保留相同的 DWA 运动学、评价函数和 A* 参考路径，只替换速度空间搜索器。
+PS_DWA_MAX_EVALUATIONS = 40
+PS_DWA_REPLAN_INTERVAL_STEPS = 4  #: 12.5 Hz，接近DWA的0.1 s模型步长并同步感知
+
+# ---------- iPlanner（RSS 2023官方网络与预训练权重）----------
+_HIMLOCO_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+IPLANNER_MODEL_PATH = os.environ.get(
+    "HIMLOCO_IPLANNER_MODEL",
+    os.path.join(_HIMLOCO_REPO_ROOT, "assets/checkpoints/iplanner/plannernet.pt"))
+IPLANNER_RUNTIME_DIR = os.environ.get(
+    "HIMLOCO_IPLANNER_RUNTIME",
+    os.path.join(_HIMLOCO_REPO_ROOT, "third_party/iplanner_runtime"))
+IPLANNER_DEVICE = os.environ.get("HIMLOCO_IPLANNER_DEVICE", "cuda")
+IPLANNER_REPLAN_INTERVAL_STEPS = 4  #: 与12.5 Hz深度更新同步，避免重复推理同一帧
+IPLANNER_MAX_GOAL_DISTANCE_M = 6.0  #: 与所有局部BEV方法使用相同规划视野
+IPLANNER_MAX_VX = 1.0
+IPLANNER_MAX_WZ = 1.0
+IPLANNER_YAW_K = 2.0
+IPLANNER_LOOKAHEAD_M = 0.8
+IPLANNER_FEAR_THRESHOLD = 0.5
+IPLANNER_FEAR_BUFFER_SIZE = 10
+IPLANNER_FEAR_SPEED_M_S = 0.15
+
 # ---------- 底层下发的速度指令 ----------
 #: play1.py 导航时下发的 vx 上限（无障碍时按此速度走）。原代码写死 1.0。
 NAV_FORWARD_VX = 1.0
@@ -2044,6 +2088,23 @@ PRESETS = {
         LEG_CLOSEUP_CAPTURE=False, RECORD_FRAMES=False,
         RENDER=True,
     ),
+    # 论文原始素材采集：同时保存 RGB/Depth、BEV 各层、势场与场景总览。
+    # 建议仅跑单次代表性 trial，并用 HIMLOCO_CAPTURE_ROOT 隔离输出目录。
+    "paper_capture": dict(
+        SAVE_CAMERA_IMAGES=True, SAVE_RGB_IMAGE=True, SAVE_DEPTH_IMAGE=True,
+        SAVE_CAMERA_IMAGE_INTERVAL=50,
+        SAVE_BEV_FMM_IMAGES=True, SAVE_BEV_FMM_INTERVAL=25,
+        SAVE_BEV_FMM_MAX_PER_TRIAL=80, BEV_FMM_SHOW_POTENTIAL=True,
+        SAVE_TRIAL_ROUTE_IMAGE=True, SAVE_TRIAL_ROUTE_LOCAL_FMM_SEGMENTS=True,
+        SAVE_TRAJECTORY_NPY=True, SAVE_SUMMARY_TRAJECTORY_PLOT=True,
+        LIVE_SHOW_CAMERA_IMAGES=False, LIVE_SHOW_BEV_FMM_WINDOW=False,
+        LIVE_DRAW_VIEWER_OVERLAY=True, LIVE_DRAW_WAYPOINTS=True,
+        LIVE_DRAW_TRAJECTORY=True, LIVE_DRAW_FMM_PATH=True,
+        LIVE_FOLLOW_VIEWER_CAMERA=False, LIVE_HOLD_FINAL_ROUTE=False,
+        LIVE_VIEWER_SYNC=False, LIVE_DRAW_INTERVAL=1,
+        LEG_CLOSEUP_CAPTURE=False, RECORD_FRAMES=False,
+        RENDER=True,
+    ),
     # 全开：调试用，最慢。同样需要相机（要存 RGB/Depth + 三联图）。
     "all": dict(
         SAVE_CAMERA_IMAGES=True, SAVE_RGB_IMAGE=True, SAVE_DEPTH_IMAGE=True,
@@ -2143,13 +2204,22 @@ def apply_preset(name):
 
 apply_preset(ACTIVE_PRESET)
 
+# 为论文素材采集提供独立输出根目录，避免覆盖或混入历史图片。
+_CAPTURE_ROOT = os.environ.get("HIMLOCO_CAPTURE_ROOT", "").strip()
+if _CAPTURE_ROOT:
+    SAVE_CAMERA_IMAGE_DIR = os.path.join(_CAPTURE_ROOT, "camera")
+    SAVE_BEV_FMM_DIR = os.path.join(_CAPTURE_ROOT, "bev_fmm")
+    SAVE_TRIAL_ROUTE_DIR = os.path.join(_CAPTURE_ROOT, "trial_route")
+    SAVE_TRAJECTORY_DIR = os.path.join(_CAPTURE_ROOT, "trajectories")
+    SAVE_SUMMARY_TRAJECTORY_PLOT_DIR = os.path.join(_CAPTURE_ROOT, "summary")
+
 
 def ensure_dirs():
     """按当前开关，预先把需要的输出目录建好。"""
     needed = []
     if SAVE_BEV_FMM_IMAGES:
         needed.append(SAVE_BEV_FMM_DIR)
-        for sub in ("height", "obstacles", "potential"):
+        for sub in ("height", "obstacles", "soft_cost", "potential"):
             needed.append(os.path.join(SAVE_BEV_FMM_DIR, sub))
     if SAVE_TRIAL_ROUTE_IMAGE:
         needed.append(SAVE_TRIAL_ROUTE_DIR)

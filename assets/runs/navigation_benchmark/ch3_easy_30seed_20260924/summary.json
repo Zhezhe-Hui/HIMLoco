@@ -28,7 +28,8 @@
     "stall_escape_count_mean": 2.7666666666666666,
     "stall_escape_count_std": 2.246231411844193,
     "min_path_clearance_m_mean": 0.25495097041130066,
-    "min_path_clearance_m_std": 0.0
+    "min_path_clearance_m_std": 0.0,
+    "method_display_name": "固定膨胀FMM"
   },
   {
     "method": "fmm_soft",
@@ -59,7 +60,8 @@
     "stall_escape_count_mean": 1.5666666666666667,
     "stall_escape_count_std": 2.155355088043628,
     "min_path_clearance_m_mean": 0.45979170377055806,
-    "min_path_clearance_m_std": 0.06412817330495148
+    "min_path_clearance_m_std": 0.06412817330495148,
+    "method_display_name": "双层代价FMM"
   },
   {
     "method": "mppi",
@@ -90,6 +92,7 @@
     "stall_escape_count_mean": 0.8666666666666667,
     "stall_escape_count_std": 1.4313940369055924,
     "min_path_clearance_m_mean": 0.48908259510993957,
-    "min_path_clearance_m_std": 0.05743013371235731
+    "min_path_clearance_m_std": 0.05743013371235731,
+    "method_display_name": "双层代价FMM引导的足迹MPPI"
   }
 ]

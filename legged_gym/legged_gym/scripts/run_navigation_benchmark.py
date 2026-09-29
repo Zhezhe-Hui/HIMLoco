@@ -36,6 +36,47 @@ METHODS = {
         "HIMLOCO_PLANNER_MODE": "astar_dwa",
         "HIMLOCO_TEMPORAL_MEMORY": "0",
     },
+    "sapf": {
+        "HIMLOCO_PLANNER_MODE": "sapf",
+        "HIMLOCO_TEMPORAL_MEMORY": "0",
+    },
+    "ps_dwa": {
+        "HIMLOCO_PLANNER_MODE": "ps_dwa",
+        "HIMLOCO_TEMPORAL_MEMORY": "0",
+    },
+    "iplanner": {
+        "HIMLOCO_PLANNER_MODE": "iplanner",
+        "HIMLOCO_TEMPORAL_MEMORY": "0",
+    },
+}
+
+METHOD_DISPLAY_NAMES = {
+    "fmm_fixed": "固定膨胀FMM",
+    "fmm_soft": "双层代价FMM",
+    "mppi": "双层代价FMM引导的足迹MPPI",
+    "mppi_memory": "时序记忆+双层代价FMM引导的足迹MPPI",
+    "astar_dwa": "A*+DWA",
+    "sapf": "SAPF",
+    "ps_dwa": "PS-DWA",
+    "iplanner": "iPlanner",
+}
+
+METHOD_PROVENANCE = {
+    "sapf": {
+        "paper": "Safe Artificial Potential Field, IEEE RA-L 2023",
+        "implementation": "native NumPy occupancy-grid adaptation from the paper equations",
+        "official_author_code": False,
+    },
+    "ps_dwa": {
+        "paper": "PatternSearch-Dynamic Window Approach, AM&A 2025",
+        "implementation": "native Python pattern-search adaptation of the shared A*+DWA baseline",
+        "official_author_code": False,
+    },
+    "iplanner": {
+        "paper": "iPlanner: Imperative Path Planning, RSS 2023",
+        "implementation": "official pretrained network and interpolation with a HIMLoco velocity adapter",
+        "official_author_code": True,
+    },
 }
 
 CAMERA_UNAVAILABLE_MARKER = "headless 下无法创建相机"
@@ -69,6 +110,7 @@ def write_summary(rows, out_dir):
                 failures[reason] = failures.get(reason, 0) + 1
         summary = {
             "method": method,
+            "method_display_name": METHOD_DISPLAY_NAMES.get(method, method),
             "trials": len(method_rows),
             "successes": len(successful),
             "success_rate": len(successful) / float(len(method_rows)),
@@ -84,7 +126,7 @@ def write_summary(rows, out_dir):
             values = [float(row[metric]) for row in source
                       if isinstance(row.get(metric), (int, float))]
             summary[output_name + "_mean"] = (
-                statistics.fmean(values) if values else None)
+                statistics.mean(values) if values else None)
             summary[output_name + "_std"] = (
                 statistics.pstdev(values) if len(values) > 1 else 0.0
                 if values else None)
@@ -127,6 +169,7 @@ def load_resume_records(out_dir):
             continue
         record.update({
             "method": method,
+            "method_display_name": METHOD_DISPLAY_NAMES.get(method, method),
             "seed": seed,
             "process_returncode": returncode,
         })
@@ -183,6 +226,11 @@ def main():
         "python": sys.executable,
         "git_commit": git_commit,
         "git_dirty": bool(git_diff),
+        "method_provenance": {
+            method: METHOD_PROVENANCE.get(method, {
+                "implementation": "HIMLoco repository implementation"
+            }) for method in args.methods
+        },
     }
     config_path = out_dir / "config.json"
     if args.resume and config_path.exists():
@@ -240,6 +288,7 @@ def main():
                 })
             record.update({
                 "method": method,
+                "method_display_name": METHOD_DISPLAY_NAMES.get(method, method),
                 "seed": seed,
                 "process_returncode": completed.returncode,
             })

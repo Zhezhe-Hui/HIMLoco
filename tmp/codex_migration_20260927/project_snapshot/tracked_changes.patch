@@ -1,0 +1,1110 @@
+diff --git "a/docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md" "b/docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md"
+index 42d1b53..8c2c438 100644
+--- "a/docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md"
++++ "b/docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md"
+@@ -8,7 +8,7 @@ Intel RealSense D435i。研究不采用纯图像到关节动作的端到端方
+ 
+ ```text
+ D435i 深度图 + 机器人位姿
+-        -> 局部几何BEV + 距离场/足迹MPPI规划（第3章上层）
++        -> 局部几何BEV + 距离场/双层代价FMM引导的足迹MPPI规划（第3章上层）
+         -> RGB-D语义几何融合的连续可通行性（第4章）
+         -> HIMLoco强化学习速度跟踪与运动控制（第3章底层基石）
+         -> Go2 实物系统验证（第5章）
+@@ -66,7 +66,7 @@ ViPlanner/WVN类方法对比。
+ 接口、安全急停和仿真到实物参数迁移。实物环境包括散落障碍、转角侧障碍、窄通道、
+ 草地、碎石和低矮台阶。
+ 
+-完整系统对比至少包含：纯深度+原始FMM、纯深度+足迹MPPI、视觉可通行性+足迹MPPI。
++完整系统对比至少包含：纯深度+原始FMM、纯深度+双层代价FMM引导的足迹MPPI、视觉可通行性+双层代价FMM引导的足迹MPPI。
+ 
+ ### 第6章 总结与展望
+ 
+@@ -172,20 +172,20 @@ assets/runs/<experiment>/<YYYYMMDD_HHMMSS>/
+ 离线双层代价实验命令：
+ 
+ ```bash
+-cd /home/fabu/HIMLoco
+-PATH=/home/fabu/miniconda3/envs/himloco/bin:$PATH \
+-LD_LIBRARY_PATH=/home/fabu/miniconda3/envs/himloco/lib:${LD_LIBRARY_PATH:-} \
+-PYTHONPATH=/home/fabu/HIMLoco/legged_gym:/home/fabu/HIMLoco/libraries/isaacgym/python \
+-/home/fabu/miniconda3/envs/himloco/bin/python \
++cd /home/hzz/project/HIMLoco
++PATH=/home/hzz/miniconda3/envs/himloco/bin:$PATH \
++LD_LIBRARY_PATH=/home/hzz/miniconda3/envs/himloco/lib:${LD_LIBRARY_PATH:-} \
++PYTHONPATH=/home/hzz/project/HIMLoco/legged_gym:/home/hzz/project/HIMLoco/libraries/isaacgym/python \
++/home/hzz/miniconda3/envs/himloco/bin/python \
+ legged_gym/legged_gym/scripts/experiment_fmm_cost_layers.py
+ 对应回归测试：
+ 
+ ```bash
+-cd /home/fabu/HIMLoco
+-PATH=/home/fabu/miniconda3/envs/himloco/bin:$PATH \
+-LD_LIBRARY_PATH=/home/fabu/miniconda3/envs/himloco/lib:${LD_LIBRARY_PATH:-} \
+-PYTHONPATH=/home/fabu/HIMLoco/legged_gym:/home/fabu/HIMLoco/libraries/isaacgym/python \
+-/home/fabu/miniconda3/envs/himloco/bin/python -m unittest \
++cd /home/hzz/project/HIMLoco
++PATH=/home/hzz/miniconda3/envs/himloco/bin:$PATH \
++LD_LIBRARY_PATH=/home/hzz/miniconda3/envs/himloco/lib:${LD_LIBRARY_PATH:-} \
++PYTHONPATH=/home/hzz/project/HIMLoco/legged_gym:/home/hzz/project/HIMLoco/libraries/isaacgym/python \
++/home/hzz/miniconda3/envs/himloco/bin/python -m unittest \
+ legged_gym.tests.test_fmm_soft_cost
+ ```
+ 
+@@ -322,10 +322,10 @@ FMM 控制同步增加三层保护：距离场从 50 Hz 降为与深度感知一
+ 肉眼测试命令（一次启动、一个静态障碍 seed）：
+ 
+ ```bash
+-cd /home/fabu/HIMLoco
++cd /home/hzz/project/HIMLoco
+ conda activate himloco
+ export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+-export PYTHONPATH=/home/fabu/HIMLoco/legged_gym:/home/fabu/HIMLoco/libraries/isaacgym/python
++export PYTHONPATH=/home/hzz/project/HIMLoco/legged_gym:/home/hzz/project/HIMLoco/libraries/isaacgym/python
+ HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=random_corridor \
+ HIMLOCO_SCENE_SEED=20260923 HIMLOCO_NUM_TRIALS=1 \
+ python legged_gym/legged_gym/scripts/play1.py --task=go2
+@@ -428,7 +428,7 @@ python legged_gym/legged_gym/scripts/play1.py --task=go2
+ 固定窄门采用相同场景、每种方法连续3轮。GPU PhysX仍有非确定性，因此这里只作为小样本
+ 功能对比，不作为论文最终统计：
+ 
+-| 指标 | FMM基线 | 世界记忆+足迹MPPI | 变化 |
++| 指标 | FMM基线 | 世界记忆+双层代价FMM引导的足迹MPPI | 变化 |
+ | --- | ---: | ---: | ---: |
+ | 成功率 | 3/3 | 3/3 | 相同 |
+ | 平均到达时间 | 30.92 s | 30.50 s | -1.4% |
+@@ -529,7 +529,7 @@ python legged_gym/legged_gym/scripts/play1.py --task=go2
+ 19.08 s、19.64 m，平均/P95规划6.70/10.56 ms，机身接触0，且JSON明确记录
+ `actor_truth_whitelist=false`。
+ 
+-30个固定seed正式命令（在 `/home/fabu/HIMLoco/legged_gym` 执行）：
++30个固定seed正式命令（在 `/home/hzz/project/HIMLoco/legged_gym` 执行）：
+ 
+ ```bash
+ python legged_gym/scripts/run_navigation_benchmark.py \
+@@ -582,8 +582,8 @@ seed `20260933` 在旧逻辑中40.54 s发生机身接触后失败，新逻辑避
+ | 方法 | 结果 | 用时 | 路程 | 平均规划耗时 | 角速度变化 | 逃逸 |
+ | --- | --- | ---: | ---: | ---: | ---: | ---: |
+ | 固定膨胀FMM | 卡住 | 53.88 s | 20.74 m | 6.79 ms | 0.0286 | 6 |
+-| 软代价FMM | 成功 | 41.54 s | 25.83 m | 6.87 ms | 0.0288 | 1 |
+-| 足迹MPPI | 成功 | 34.56 s | 24.53 m | 9.37 ms | 0.0123 | 0 |
++| 双层代价FMM | 成功 | 41.54 s | 25.83 m | 6.87 ms | 0.0288 | 1 |
++| 双层代价FMM引导的足迹MPPI | 成功 | 34.56 s | 24.53 m | 9.37 ms | 0.0123 | 0 |
+ | A*+DWA | 成功 | 30.56 s | 24.50 m | 11.45 ms | 0.0057 | 0 |
+ 
+ 单seed中A*+DWA优于MPPI，故将其保留为强传统基线，不能预设本文方法胜出。批处理脚本现会在
+@@ -622,29 +622,30 @@ seed `20260933` 在旧逻辑中40.54 s发生机身接触后失败，新逻辑避
+ 
+ ### 8.8 有相机30-seed正式结果
+ 
+-使用seed `20261000..20261029`，每个seed分别启动独立进程运行固定膨胀FMM、软代价FMM、
+-足迹MPPI和A*+DWA，共120轮。所有进程返回码均为0，120份日志均无相机不可用标记。
++使用seed `20261000..20261029`，每个seed分别启动独立进程运行固定膨胀FMM、双层代价FMM、
++双层代价FMM引导的足迹MPPI和A*+DWA，共120轮。所有进程返回码均为0，120份日志均无相机不可用标记。
+ 原始数据和统计文件位于
+ `assets/runs/navigation_benchmark/formal_30seed_camera_20260923/`。
+ 
+ | 方法 | 成功率（95% Wilson CI） | 成功样本用时 | 路程 | 角速度变化 | 平均规划耗时 | 卡住/超时/碰撞 |
+ | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+ | 固定膨胀FMM | 11/30，36.7% [21.9%, 54.5%] | 47.30 s | 26.96 m | 0.0263 | 6.65 ms | 12 / 4 / 3 |
+-| 软代价FMM | 13/30，43.3% [27.4%, 60.8%] | 45.13 s | 26.86 m | 0.0269 | 6.51 ms | 12 / 3 / 2 |
+-| 足迹MPPI | 16/30，53.3% [36.1%, 69.8%] | 38.69 s | 25.25 m | 0.0119 | 9.17 ms | 13 / 0 / 1 |
++| 双层代价FMM | 13/30，43.3% [27.4%, 60.8%] | 45.13 s | 26.86 m | 0.0269 | 6.51 ms | 12 / 3 / 2 |
++| 双层代价FMM引导的足迹MPPI | 16/30，53.3% [36.1%, 69.8%] | 38.69 s | 25.25 m | 0.0119 | 9.17 ms | 13 / 0 / 1 |
+ | A*+DWA | 3/30，10.0% [3.5%, 25.6%] | 40.19 s | 26.48 m | 0.0093 | 11.45 ms | 25 / 1 / 1 |
+ 
+-成功率采用相同seed配对的McNemar精确检验。MPPI相对固定FMM为8个仅MPPI成功、3个仅FMM
+-成功，`p=0.2266`；相对软FMM为5比2，`p=0.4531`。因此当前30个seed只能说MPPI成功率
+-数值最高，不能声称相对两种FMM有统计显著提升。MPPI相对DWA为13比0，`p=0.00024`，
++成功率采用相同seed配对的McNemar精确检验。双层代价FMM引导的足迹MPPI相对固定膨胀FMM为
++8个仅本文方法成功、3个仅固定膨胀FMM成功，`p=0.2266`；相对双层代价FMM为5比2，
++`p=0.4531`。因此当前30个seed只能说本文方法成功率数值最高，不能声称相对两种FMM有
++统计显著提升。本文方法相对A*+DWA为13比0，`p=0.00024`，
+ 成功率差异显著。
+ 
+ 为避免“只比较各自成功样本”造成选择偏差，效率指标还在双方共同成功的seed上做配对检验：
+ 
+-1. 相对固定FMM的8个共同成功seed，MPPI平均少8.94 s，`p=0.0547`；角速度变化降低
++1. 相对固定膨胀FMM的8个共同成功seed，本文方法平均少8.94 s，`p=0.0547`；角速度变化降低
+    0.0145，`p=0.0078`；规划增加2.57 ms，`p=0.0078`；最小净空增加0.141 m，
+    `p=0.0078`。能耗指标高42.45，`p=0.0078`，属于明确代价。
+-2. 相对软FMM的11个共同成功seed，MPPI平均少5.73 s，`p=0.0244`；路程少1.41 m，
++2. 相对双层代价FMM的11个共同成功seed，本文方法平均少5.73 s，`p=0.0244`；路程少1.41 m，
+    `p=0.0137`；角速度变化降低0.0154，`p=0.0010`；规划增加2.64 ms，`p=0.0010`。
+    净空与能耗差异不显著。
+ 3. DWA的角速度指令很平滑，但25/30卡住，说明“局部控制平滑”不能替代跨局部极小值能力。
+@@ -683,26 +684,27 @@ python legged_gym/scripts/analyze_navigation_benchmark.py \
+ | 方法 | 成功率（95% Wilson CI） | 成功样本用时 | 路程 | 角速度变化 | 平均规划耗时 | 卡住/超时/碰撞 |
+ | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+ | 固定膨胀FMM | 16/30，53.3% [36.1%, 69.8%] | 51.90 s | 27.62 m | 0.0262 | 6.72 ms | 9 / 3 / 2 |
+-| 软代价FMM | 15/30，50.0% [33.2%, 66.8%] | 39.74 s | 26.18 m | 0.0274 | 6.60 ms | 10 / 2 / 3 |
+-| 足迹MPPI | 17/30，56.7% [39.2%, 72.6%] | 37.18 s | 24.90 m | 0.0122 | 9.34 ms | 11 / 2 / 0 |
++| 双层代价FMM | 15/30，50.0% [33.2%, 66.8%] | 39.74 s | 26.18 m | 0.0274 | 6.60 ms | 10 / 2 / 3 |
++| 双层代价FMM引导的足迹MPPI | 17/30，56.7% [39.2%, 72.6%] | 37.18 s | 24.90 m | 0.0122 | 9.34 ms | 11 / 2 / 0 |
+ | A*+DWA | 2/30，6.7% [1.8%, 21.3%] | 41.39 s | 27.37 m | 0.0088 | 11.76 ms | 27 / 0 / 1 |
+ 
+-成功率配对检验：MPPI相对固定FMM为6个仅MPPI成功、5个仅FMM成功，`p=1.0`；相对
+-软FMM为6比4，`p=0.7539`。因此MPPI的成功率与FMM没有显著差异。相对DWA为15比0，
++成功率配对检验：本文方法相对固定膨胀FMM为6个仅本文方法成功、5个仅固定膨胀FMM成功，
++`p=1.0`；相对双层代价FMM为6比4，`p=0.7539`。因此本文方法的成功率与两种FMM没有
++显著差异。相对A*+DWA为15比0，
+ `p=0.000061`，差异显著。
+ 
+ 共同成功seed上的配对结果：
+ 
+-1. MPPI与固定FMM共同成功11组。MPPI用时少14.10 s、路程少2.67 m、角速度变化少
++1. 本文方法与固定膨胀FMM共同成功11组。本文方法用时少14.10 s、路程少2.67 m、角速度变化少
+    0.0139、最小净空多0.141 m，四项Wilcoxon检验均为 `p=0.00098`；规划耗时增加
+    2.57 ms，`p=0.00098`；能耗差异不显著。
+-2. MPPI与软FMM共同成功11组。MPPI角速度变化少0.0160，`p=0.00098`；规划耗时增加
++2. 本文方法与双层代价FMM共同成功11组。本文方法角速度变化少0.0160，`p=0.00098`；规划耗时增加
+    2.68 ms，`p=0.00098`。用时差 `p=0.2402`、路程差 `p=0.0537`、净空和能耗差均
+    不显著。
+ 
+-第三章可支持的结论是：足迹MPPI在不显著改变到达率的情况下，相对固定膨胀FMM显著改善
+-到达效率、控制平滑性和净空，并相对软代价FMM显著改善控制平滑性；代价是每次规划增加
+-约2.6至2.7 ms。不能写成“MPPI显著提高成功率”。软代价FMM也不能作为独立成功率贡献，
++第三章可支持的结论是：双层代价FMM引导的足迹MPPI在不显著改变到达率的情况下，相对固定膨胀FMM显著改善
++到达效率、控制平滑性和净空，并相对双层代价FMM显著改善控制平滑性；代价是每次规划增加
++约2.6至2.7 ms。不能写成“MPPI显著提高成功率”。双层代价FMM也不能作为独立成功率贡献，
+ 它更适合作为连续代价建模的中间消融。
+ 
+ ### 8.11 第三章最终实验方案调整
+@@ -717,20 +719,304 @@ python legged_gym/scripts/analyze_navigation_benchmark.py \
+ `HIMLOCO_SCENE_SEED+200000`驱动，结果JSON新增大/小石头数、树数和障碍布局哈希；统计脚本
+ 会拒绝同seed不同算法布局哈希不一致的数据。
+ 
+-seed `20261000`冒烟结果：简单MPPI成功31.32 s，同布局固定FMM在55.34 s卡住且二者hash
+-均为`ed1fc71095bf6a0d`；中等MPPI成功39.40 s；困难MPPI在35.22 s、6次脱困后卡住。
+-三档相机和碰撞均正常，400小碎石未引发显存错误。正式矩阵采用固定FMM、软代价FMM、
+-足迹MPPI三种方法，每档30个配对seed，共270轮。简化A*+DWA不进入本轮正式矩阵。
++seed `20261000`冒烟结果：简单档本文方法成功31.32 s，同布局固定膨胀FMM在55.34 s卡住且
++二者hash均为`ed1fc71095bf6a0d`；中等档本文方法成功39.40 s；困难档本文方法在35.22 s、
++6次脱困后卡住。
++三档相机和碰撞均正常，400小碎石未引发显存错误。正式矩阵采用固定膨胀FMM、双层代价FMM、
++双层代价FMM引导的足迹MPPI三种方法，每档30个配对seed，共270轮。简化A*+DWA不进入本轮正式矩阵。
+ 
+ ### 8.12 简单档正式结果与关机续跑记录
+ 
+ 简单档90轮已全部完成，目录为`assets/runs/navigation_benchmark/ch3_easy_30seed_20260924/`。
+-固定FMM、软代价FMM和足迹MPPI成功率分别为17/30、24/30和25/30，平均规划耗时分别为
++固定膨胀FMM、双层代价FMM和双层代价FMM引导的足迹MPPI成功率分别为17/30、24/30和25/30，平均规划耗时分别为
+ 6.85、6.61和8.91 ms；MPPI角速度指令总变差为0.0131，低于两种FMM的0.0241和0.0247。
+ 90份JSON与日志齐全，相机错误为0，配对布局哈希校验通过。完整统计见该目录中的
+-`statistical_analysis.json`和`statistical_analysis.md`。
++`statistical_analysis.json`和`paper_table.csv`。
++
++中等档曾在用户关机前主动停止，保留seed `20261000..20261003`的12轮数据，后在新机器上
++通过`--resume`完成剩余78轮。批处理器会校验实验清单并只跳过完整有效的历史任务。
++
++### 8.13 三档难度正式结果
++
++简单、中等、困难三档均完成固定膨胀FMM、双层代价FMM、双层代价FMM引导的足迹MPPI各30个配对seed，共270轮。
++每档均有90份JSON和90份日志，相机不可用标记为0，`paired_layout_hashes_verified=true`。
++
++| 难度 | 方法 | 成功率（95% Wilson CI） | 成功样本用时 | 路程 | 角速度变化 | 平均规划耗时 | 碰撞/卡住/超时 |
++| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
++| 简单 | 固定膨胀FMM | 17/30，56.7% [39.2%, 72.6%] | 42.49 s | 26.86 m | 0.0241 | 6.85 ms | 4/7/2 |
++| 简单 | 双层代价FMM | 24/30，80.0% [62.7%, 90.5%] | 36.23 s | 26.51 m | 0.0247 | 6.61 ms | 2/3/1 |
++| 简单 | 双层代价FMM引导的足迹MPPI | 25/30，83.3% [66.4%, 92.7%] | 34.21 s | 25.27 m | 0.0131 | 8.91 ms | 4/1/0 |
++| 中等 | 固定膨胀FMM | 10/30，33.3% [19.2%, 51.2%] | 45.95 s | 26.88 m | 0.0267 | 4.37 ms | 1/14/5 |
++| 中等 | 双层代价FMM | 10/30，33.3% [19.2%, 51.2%] | 41.97 s | 27.20 m | 0.0259 | 4.16 ms | 9/7/4 |
++| 中等 | 双层代价FMM引导的足迹MPPI | 20/30，66.7% [48.8%, 80.8%] | 41.46 s | 26.33 m | 0.0127 | 6.21 ms | 3/5/2 |
++| 困难 | 固定膨胀FMM | 3/30，10.0% [3.5%, 25.6%] | 50.58 s | 27.72 m | 0.0263 | 3.85 ms | 9/11/7 |
++| 困难 | 双层代价FMM | 5/30，16.7% [7.3%, 33.6%] | 51.82 s | 28.91 m | 0.0282 | 4.03 ms | 7/12/6 |
++| 困难 | 双层代价FMM引导的足迹MPPI | 14/30，46.7% [30.2%, 63.9%] | 43.38 s | 26.18 m | 0.0136 | 5.91 ms | 6/6/4 |
++
++简单档中本文方法相对固定膨胀FMM成功率差异接近但未达到显著（仅本文方法成功11组、仅
++固定膨胀FMM成功3组，`p=0.0574`），相对双层代价FMM无显著差异（4比3，`p=1.0`）。
++中等档本文方法相对两种FMM均为11比1，`p=0.00635`；困难档相对固定膨胀FMM为12比1，
++`p=0.00342`，相对双层代价FMM为12比3，`p=0.0352`。因此可表述为：本文方法在简单档
++保持与双层代价FMM相当的高成功率，并在
++中等和困难障碍密度下显著提高成功率；三档角速度变化均约为FMM的一半，说明控制输出更平滑。
++
++硬件记录：简单档运行于RTX 3080 Ti；中等档seed `20261000..20261003`运行于RTX 3080 Ti，
++其余seed运行于RTX 4060；困难档运行于RTX 4060。三种方法在每个seed内始终使用相同硬件，
++因此同难度内的配对成功率和指标比较仍成立，但不同难度之间的绝对规划耗时不能归因于障碍
++难度。若论文需要严格比较“难度对计算耗时的影响”，必须在同一机器上重跑三档。
++
++完整统计分别位于：
++`assets/runs/navigation_benchmark/ch3_easy_30seed_20260924/`、
++`ch3_medium_30seed_20260924/`和`ch3_hard_30seed_20260924/`。
++
++### 8.14 第三章论文图表与仿真过程素材
++
++论文图表输出目录为
++`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/`。其中`01~04`为成功率、
++结果构成、平滑性/净空和导航效率统计图，`05~07`为系统、双层代价FMM引导的足迹MPPI和实验协议流程图，
++`08~15`为Isaac Gym场景与感知规划过程图。每张组合图均同时提供300 dpi PNG和矢量PDF；
++主结果表、配对显著性表同时提供CSV和Markdown。
++
++新增`paper_capture`预设，单次运行会保存D435 RGB/Depth、局部高度BEV、足迹障碍图、
++连续软代价图、FMM势场、轨迹数组、固定俯视相机原图及路线叠加图。使用
++`HIMLOCO_CAPTURE_ROOT`可为每次采集指定独立目录，避免混入历史图片。代表性素材统一采用
++布局seed `20261001`，三档共保存约1160个文件、60 MB；原始目录为
++`assets/runs/navigation_benchmark/ch3_visual_evidence_20260925/`。
++
++代表性采集命令模板：
+ 
+-中等档在用户关机前主动停止，已完整保留seed `20261000..20261003`的12轮数据，全部进程
+-返回码为0；困难档尚未开始。批处理器新增`--resume`，会校验实验清单并只跳过完整有效的
+-历史任务。重启后的续跑、困难档、统计和完整性检查命令见
+-`docs/第三章中等与困难档手动实验命令.md`。
++```bash
++cd /home/hzz/project/HIMLoco/legged_gym
++conda activate himloco
++
++HIMLOCO_PRESET=paper_capture \
++HIMLOCO_SCENE_PRESET=random_corridor_hard \
++HIMLOCO_PLANNER_MODE=mppi \
++HIMLOCO_FMM_SOFT_COST=1 \
++HIMLOCO_TEMPORAL_MEMORY=0 \
++HIMLOCO_SCENE_SEED=20261001 \
++HIMLOCO_NUM_TRIALS=1 \
++HIMLOCO_CAPTURE_ROOT=/home/hzz/project/HIMLoco/assets/runs/navigation_benchmark/ch3_visual_evidence_20260925/hard_seed20261001 \
++HIMLOCO_RESULT_JSON=/home/hzz/project/HIMLoco/assets/runs/navigation_benchmark/ch3_visual_evidence_20260925/hard_seed20261001/result.json \
++python legged_gym/scripts/play1.py --task=go2
++```
++
++组合图可用以下命令重新生成：
++
++```bash
++cd /home/hzz/project/HIMLoco
++conda activate himloco
++python legged_gym/legged_gym/scripts/generate_ch3_figures.py
++python legged_gym/legged_gym/scripts/generate_ch3_visual_evidence.py
++```
++
++三次截图模式试验均在60 s处记为超时，终点`x`分别为29.76、28.39和28.41 m，且全过程
++没有机身接触。截图试验只用于展示场景、感知中间量和规划过程，不能替换三档各30个seed的
++正式统计。图`08`固定俯视画面中的绿色线来自Isaac Gym实时轨迹/规划线渲染；图`10`适合放在
++“视觉感知与局部代价建模”，图`11`适合放在“在线重规划”，图`01~04`和`09`适合放在实验
++结果小节，其余可放消融说明或附录。
++
++### 8.15 中等难度VIO噪声鲁棒性30-seed实验
++
++第三章最后一组实验固定使用中等难度`random_corridor_medium`、双层代价FMM引导的足迹MPPI以及
++`20261000..20261029`共30个配对seed，只改变上层位姿输入的VIO噪声。四档共120轮，
++每档均有30份JSON和30份日志；进程返回错误为0、相机错误为0，同seed四档障碍布局哈希
++完全一致。仿真真值只用于评价，不反馈给建图和规划。
++
++| VIO档位 | 严格成功率（真值误差≤0.15m） | 终止时真值误差≤0.20m | VIO误到达 | 位置RMS | 航向RMS | 误到达最大误差 |
++| --- | ---: | ---: | ---: | ---: | ---: | ---: |
++| ideal | 17/30，56.7% [39.2%, 72.6%] | 17/30 | 0 | 0.000 m | 0.00° | - |
++| mild | 7/30，23.3% [11.8%, 40.9%] | 15/30 | 8 | 0.033 m | 0.77° | 0.189 m |
++| medium | 7/30，23.3% [11.8%, 40.9%] | 15/30 | 11 | 0.095 m | 1.70° | 0.368 m |
++| severe | 5/30，16.7% [7.3%, 33.6%] | 8/30 | 12 | 0.191 m | 3.53° | 0.642 m |
++
++严格成功率相对ideal的配对McNemar检验：mild `p=0.00635`、medium `p=0.02127`、
++severe `p=0.00183`，均显著下降。若仅做阈值敏感性分析，将“终止时真值误差≤0.20m”
++视为到达，则mild和medium均为15/30，与ideal差异不显著（均`p=0.72656`）；severe为
++8/30，仍显著下降（`p=0.01172`）。0.20m结果不是正式成功率，只用于解释0.15m阈值附近
++的VIO误到达。
++
++结果说明：轻度位置漂移已经会显著影响厘米级终点判定，mild的8次误到达全部位于
++0.151至0.189m；随着噪声增强，误到达次数和最坏真实误差持续增加。中度和重度噪声下，
++系统不能只依据VIO估计距离立即宣布完成，实物部署应加入终点连续帧确认、速度降至零后的
++二次确认，必要时结合目标视觉重定位或GPS/外部定位。仿真噪声档位是压力测试值，最终应以
++D435i实测VIO轨迹重新标定，不能声称其等同于实际D435i精度。
++
++原始数据目录：
++
++- `assets/runs/navigation_benchmark/ch3_vio_ideal_30seed_20260926/`
++- `assets/runs/navigation_benchmark/ch3_vio_mild_30seed_20260926/`
++- `assets/runs/navigation_benchmark/ch3_vio_medium_30seed_20260926/`
++- `assets/runs/navigation_benchmark/ch3_vio_severe_30seed_20260926/`
++
++统计结果和图`16~18`位于
++`assets/runs/navigation_benchmark/ch3_vio_robustness_20260926/`，并同步写入第三章论文图目录。
++重新分析命令：
++
++```bash
++cd /home/hzz/project/HIMLoco
++conda activate himloco
++python legged_gym/legged_gym/scripts/analyze_vio_robustness.py
++```
++
++至此第三章正式实验完成：底层HIMLoco能力、三档障碍270轮规划对比、VIO鲁棒性120轮、
++论文统计图和过程图均已具备。时序记忆保留为负结果，不作为本文方法贡献；不再增加专门场景。
++
++### 8.16 近年外部方法筛选与代码兼容性审查
++
++筛选条件固定为：2023年及以后正式论文、论文与代码来源可核验、能够在同一Isaac Gym场景和
++同一HIMLoco底层控制器上公平比较。外部方法只替换上层局部规划器，不改变场景、深度相机、
++目标、到达/碰撞判定和底层策略。当前结论如下。
++
++| 方法 | 论文与年份 | 官方实现 | 接入结论 | 预计工作量 |
++| --- | --- | --- | --- | --- |
++| iPlanner | RSS 2023 | GitHub，MIT | 保留。预训练模型已在`himloco`环境成功加载并完成CUDA前向推理；需增加Isaac Gym深度图预处理、局部目标输入和路径跟踪适配器 | 中等 |
++| LT-DWA | IEEE RA-L 2023 | GitHub，MIT，C++/ROS Noetic/g2o | 推荐作为近年DWA系对比。不能原仓库直接调用，应将长时域状态代价树和EB-MPC核心按现有`BEV+参考路径+速度`接口移植 | 中高 |
++| SAPF | IEEE RA-L 2023 | 作者提供MATLAB源码 | 推荐作为非学习反应式局部规划对比。输入只需目标与障碍位置，可直接用现有BEV距离场实现NumPy版本，无训练 | 低 |
++| PS-DWA | Acta Mechanica et Automatica 2025 | 作者提供MATLAB源码 | 可作为“计算效率型DWA”备选；只改变DWA速度搜索方式，最容易复用现有A*+DWA接口，但论文权威性低于前三项 | 低 |
++
++iPlanner仓库检查记录：官方网络输入为前视深度图和机器人坐标系三维目标，输出5个三维关键点
++和一个碰撞恐惧值，再以三次插值生成局部路径；速度命令需要独立路径跟踪器。官方约207 MB
++的`plannernet.pt`已在本机PyTorch 1.13.1/CUDA 11.7环境成功反序列化，随机`1x3x360x640`
++输入得到`1x5x3`关键点，RTX GPU的20次纯网络前向平均约5.63 ms。该检查只证明软件接口可用，
++不代表预训练模型能适应当前Isaac Gym深度分布；正式对比前必须先做深度符号、单位、裁剪和
++相机视场标定，再跑固定seed冒烟实验。
++
++LT-DWA仓库检查记录：官方实现约3956行C++，依赖ROS Noetic、PCL、OpenCV、g2o和
++SuiteSparse。方法先由长时域动态窗口建立多层状态代价树，再用EB-MPC图优化降低抖动，输出
++满足速度和加速度约束的控制。当前场景障碍为静态，因此可将时变距离场退化为重复的静态
++BEV距离场；但若只抄一个“长预测DWA”而不保留状态树和EB-MPC，就不能在论文中称为LT-DWA。
++
++暂不采用的候选：T-RO 2024的Dynamic Adaptive DWA论文权威性很高，但需要PPO训练的权重预测
++网络，未找到作者公开实现和预训练权重，不能直接公平复现；Electronics 2024的模糊自适应DWA
++虽易按公式重写，但同样未找到作者代码；ICRA 2024的When2Replan研究的是全局重规划时机，
++依赖完整ROS导航栈，不是本课题要替换的局部避障器。它们可写入相关工作，不进入当前对比矩阵。
++
++建议的外部对比优先级为`SAPF -> iPlanner -> LT-DWA`，PS-DWA仅在需要第四个方法或专门讨论
++规划时间时加入。
++
++### 8.17 SAPF与PS-DWA统一框架实现及冒烟实验
++
++2026-09-26已在本项目内完成两种论文方法的统一接口实现：
++
++- `SAPF`：依据IEEE RA-L 2023论文中的安全人工势场公式实现。由BEV距离变换得到最近障碍
++  距离和方向，按距离相关角度旋转排斥力形成涡旋，并保留0.30 m硬安全区。这里是占据栅格
++  版本的NumPy适配，不是作者MATLAB源码的逐行移植。
++- `PS-DWA`：保留本项目相同的A*参考路径、DWA运动学和轨迹评价函数，用有界模式搜索替换
++  原来的`10x15=150`组速度穷举；每次最多评价40组候选。远距离目标会先裁剪到6 m局部BEV
++  边界，再进行A*搜索。
++
++代码位于`legged_gym/legged_gym/envs/go2/paper_baseline_planners.py`，运行模式分别为
++`HIMLOCO_PLANNER_MODE=sapf`和`HIMLOCO_PLANNER_MODE=ps_dwa`。论文图例和表格可简写为
++`SAPF`、`PS-DWA`；方法小节必须说明是依据论文公式在本文统一框架中的重新实现，不能写成
++作者官方代码原样运行。这样才能准确解释BEV输入、Go2速度接口和原MATLAB实现之间的差异。
++
++单元测试共40项全部通过。固定简单档seed `20261000..20261002`的三轮筛查结果如下；三种
++seed的障碍布局与既有第三章实验相同，且仍使用理想VIO和同一HIMLoco底层策略。
++
++| 方法 | 成功数 | 失败构成 | 成功样本路程 | 平均规划耗时范围 | 机身/侧向接触 |
++| --- | ---: | --- | ---: | ---: | ---: |
++| SAPF | 0/3 | 卡住1、碰撞1、超时1 | - | 3.66至4.60 ms | 碰撞seed有1步 |
++| PS-DWA（最终12.5 Hz配置） | 2/3 | 碰撞/卡住1 | 25.11、26.07 m | 35.41至50.77 ms | 1步轻微接触 |
++| iPlanner | 2/3 | 卡住1 | 25.17、25.72 m | 7.06至7.23 ms | 0 |
++
++将相同三个seed的既有基线合并后，成功数为：固定膨胀FMM `0/3`、双层代价FMM `1/3`、
++足迹MPPI `3/3`、SAPF `0/3`、PS-DWA `2/3`、iPlanner `2/3`。早期五方法筛查表和
++成功数/全样本规划耗时图位于
++`assets/runs/navigation_benchmark/paper_baselines_5method_screen_3seed_20260926/`；图标题已经注明
++`3 paired seeds; not formal statistics`，只用于代码筛查和决定正式实验，不放入论文最终结果表。
++
++这三轮只是代码筛查，不能作为论文最终成功率。SAPF在对称/密集障碍中仍会出现局部极小；
++PS-DWA最终按其0.1 s运动学步长与12.5 Hz感知同步，每80 ms更新一次，速度指令仍以50 Hz保持，
++不再以50 Hz对同一深度帧重复执行Python A*。不得只保留成功seed或针对筛查seed调参。
++
++正式三档30-seed命令如下（外部三方法90轮，本文方法30轮）：
++
++```bash
++cd /home/hzz/project/HIMLoco
++export PATH=/home/hzz/miniconda3/envs/himloco/bin:$PATH
++export LD_LIBRARY_PATH=/home/hzz/miniconda3/envs/himloco/lib:${LD_LIBRARY_PATH:-}
++export PYTHONPATH=/home/hzz/project/HIMLoco/legged_gym:/home/hzz/project/HIMLoco/libraries/isaacgym/python
++
++python legged_gym/legged_gym/scripts/run_navigation_benchmark.py \
++  --scene random_corridor_easy --methods sapf ps_dwa iplanner \
++  --seed-start 20261000 --num-seeds 30 --vio ideal \
++  --output assets/runs/navigation_benchmark/ch3_external_easy_30seed_20260926
++
++python legged_gym/legged_gym/scripts/run_navigation_benchmark.py \
++  --scene random_corridor_easy --methods mppi \
++  --seed-start 20261000 --num-seeds 30 --vio ideal \
++  --output assets/runs/navigation_benchmark/ch3_external_mppi_easy_30seed_20260926
++
++python legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py \
++  assets/runs/navigation_benchmark/ch3_external_easy_30seed_20260926 \
++  --additional-directory assets/runs/navigation_benchmark/ch3_external_mppi_easy_30seed_20260926 \
++  --reference mppi
++```
++
++中等档和困难档将场景分别替换为`random_corridor_medium`、`random_corridor_hard`，输出目录
++按8.18节列出的正式目录对应替换。分析输出写入外部方法目录，不会改动内部消融数据。
++
++论文及代码地址：SAPF论文DOI为`https://doi.org/10.1109/LRA.2023.3290819`，作者算法
++示例为`https://www.mathworks.com/matlabcentral/fileexchange/129474-comparison-of-local-path-planning-algorithms`；
++PS-DWA论文DOI为`https://doi.org/10.2478/ama-2025-0074`，作者示例为
++`https://www.mathworks.com/matlabcentral/fileexchange/180896-patternsearch-dynamic-window-approach`；
++iPlanner论文为`https://www.roboticsproceedings.org/rss19/p064.pdf`，官方仓库为
++`https://github.com/leggedrobotics/iPlanner`。
++
++筛查原始目录为`paper_baselines_smoke_v2_20260926/`（seed 20261000）和
++`paper_baselines_screen_3seed_20260926/`（seed 20261001..20261002）。更早的
++`paper_baselines_smoke_20260926/`只有错误场景键产生的进程错误，不是算法实验，不得统计。
++iPlanner已使用官方预训练网络与官方三次轨迹插值接入正式导航循环；深度图保持米制并缩放为
++`360x640`，目标限制在与其他方法相同的6 m局部视野，再由统一路径跟踪器转换为`vx/wz`。
++LT-DWA尚未移植。
++
++### 8.18 外部方法三档30-seed正式对比
++
++外部对比与内部消融采用完全相同的流程：离散高度地形、简单/中等/困难三档、固定seed
++`20261000..20261029`、理想VIO、同一HIMLoco底层策略、60 s上限以及相同的到达、碰撞、
++卡住和超时判据。外部对比只替换上层规划器。为避免硬件混杂影响规划耗时，四种方法全部在
++同一RTX 4060 8 GB上重新运行；每档120轮，三档共360轮，进程错误为0，同seed四方法的
++`obstacle_layout_hash`全部一致。
++
++| 难度 | 本文足迹MPPI | iPlanner | PS-DWA | SAPF |
++| --- | ---: | ---: | ---: | ---: |
++| 简单 | 25/30（83.3%） | 22/30（73.3%） | 13/30（43.3%） | 5/30（16.7%） |
++| 中等 | 18/30（60.0%） | 19/30（63.3%） | 13/30（43.3%） | 4/30（13.3%） |
++| 困难 | 10/30（33.3%） | 14/30（46.7%） | 6/30（20.0%） | 1/30（3.3%） |
++| 三档合计 | 53/90（58.9%） | 55/90（61.1%） | 32/90（35.6%） | 10/90（11.1%） |
++
++成功率结论必须如实表述：iPlanner合计比本文方法多成功2次，但本文方法与iPlanner的90组
++配对McNemar检验`p=0.8388`，没有显著差异，不能声称任一方法成功率显著更高。本文方法相对
++PS-DWA为“仅本文成功28组、仅对方成功7组”，`p=0.0005083`；相对SAPF为45组对2组，
++`p=1.60e-11`，优势显著。
++
++本文方法的主要优势体现在轨迹质量和计算效率。三档全样本平均规划耗时为5.82 ms，低于
++iPlanner的7.20 ms和PS-DWA的45.99 ms；SAPF虽仅3.56 ms，但成功率很低。在本文方法与
++iPlanner共同成功的42组seed上，路径平滑度为0.0363 rad，对方为0.1517 rad，降低76.0%，
++Wilcoxon `p=1.65e-8`；能耗指标为740.04与774.49，`p=7.58e-5`。iPlanner共同成功样本的
++到达时间更短（32.58 s对36.57 s，`p=0.000453`），应同时报告，不能隐去。
++
++因此论文推荐结论为：“本文方法在三档复杂地形中取得与iPlanner统计相当的导航成功率，
++并显著改善轨迹平滑性，以较低规划开销获得更适合四足机器人执行的连续速度指令；相比
++PS-DWA和SAPF则在成功率上具有显著优势。”这比笼统写成“所有指标最好”更经得住答辩追问。
++
++正式原始数据目录：
++
++- `ch3_external_easy_30seed_20260926/`、`ch3_external_medium_30seed_20260926/`、
++  `ch3_external_hard_30seed_20260926/`：SAPF、PS-DWA和iPlanner，共270轮；
++- `ch3_external_mppi_easy_30seed_20260926/`、`ch3_external_mppi_medium_30seed_20260926/`、
++  `ch3_external_mppi_hard_30seed_20260926/`：同机本文方法，共90轮；
++- `ch3_external_comparison_20260926/`：正式CSV、JSON、五组PNG/PDF对比图。
++
++五组图同时按第三章连续编号同步到`ch3_paper_figures_20260925/`：图19为三档成功率，图20为
++总体成功率与规划耗时，图21为平滑度与到达时间，图22为失败类型构成，图23为配对McNemar
++结果。外部对比表和统计JSON也已同步到该论文图目录。
++
++重新生成全部外部对比图表：
++
++```bash
++cd /home/hzz/project/HIMLoco
++conda activate himloco
++python legged_gym/legged_gym/scripts/generate_external_comparison_figures.py
++```
+diff --git "a/docs/\347\254\254\344\270\211\347\253\240\344\270\255\347\255\211\344\270\216\345\233\260\351\232\276\346\241\243\346\211\213\345\212\250\345\256\236\351\252\214\345\221\275\344\273\244.md" "b/docs/\347\254\254\344\270\211\347\253\240\344\270\255\347\255\211\344\270\216\345\233\260\351\232\276\346\241\243\346\211\213\345\212\250\345\256\236\351\252\214\345\221\275\344\273\244.md"
+index edd9816..370827c 100644
+--- "a/docs/\347\254\254\344\270\211\347\253\240\344\270\255\347\255\211\344\270\216\345\233\260\351\232\276\346\241\243\346\211\213\345\212\250\345\256\236\351\252\214\345\221\275\344\273\244.md"
++++ "b/docs/\347\254\254\344\270\211\347\253\240\344\270\255\347\255\211\344\270\216\345\233\260\351\232\276\346\241\243\346\211\213\345\212\250\345\256\236\351\252\214\345\221\275\344\273\244.md"
+@@ -1,46 +1,47 @@
+ # 第三章中等与困难档手动实验命令
+ 
+-本文档用于在电脑重启后继续第三章正式导航实验。三档统一使用离散高度地形、HIMLoco底层
+-运动策略、理想VIO、固定seed `20261000..20261029`，对比固定膨胀FMM、软代价FMM和
+-足迹MPPI。视觉导航命令严禁添加 `--headless`，否则Isaac Gym不会创建深度相机。
++本文档记录第三章正式导航实验的运行与复现命令。三档统一使用离散高度地形、HIMLoco底层
++运动策略、理想VIO、固定seed `20261000..20261029`，对比固定膨胀FMM、双层代价FMM和
++双层代价FMM引导的足迹MPPI。视觉导航命令严禁添加 `--headless`，否则Isaac Gym不会创建深度相机。
+ 
+ ## 1. 打开终端后的环境准备
+ 
+ ```bash
+-cd /home/fabu/HIMLoco
+-export PATH=/home/fabu/miniconda3/envs/himloco/bin:$PATH
+-export LD_LIBRARY_PATH=/home/fabu/miniconda3/envs/himloco/lib:${LD_LIBRARY_PATH:-}
+-export PYTHONPATH=/home/fabu/HIMLoco/legged_gym:/home/fabu/HIMLoco/libraries/isaacgym/python
++cd /home/hzz/project/HIMLoco
++export PATH=/home/hzz/miniconda3/envs/himloco/bin:$PATH
++export LD_LIBRARY_PATH=/home/hzz/miniconda3/envs/himloco/lib:${LD_LIBRARY_PATH:-}
++export PYTHONPATH=/home/hzz/project/HIMLoco/legged_gym:/home/hzz/project/HIMLoco/libraries/isaacgym/python
+ ```
+ 
+-## 2. 续跑中等档
++## 2. 复现或续跑中等档
+ 
+-中等档为`15大石+3棵树+200小碎石`。2026-09-24关机前已完整完成4个seed、12个任务，
+-目录中数据均为返回码0。下面的`--resume`会校验原实验配置，只跳过JSON、日志、CSV均完整
+-且相机正常的任务，然后从第5个seed继续。不要删除原目录，也不要修改scene、方法、seed或VIO。
++中等档为`15大石+3棵树+200小碎石`，现已完成90/90。下面的`--resume`会校验原实验配置，
++只跳过JSON、日志、CSV均完整且相机正常的任务；结果完整时执行它不会重复运行。不要删除
++原目录，也不要修改scene、方法、seed或VIO。
+ 
+ ```bash
+ python legged_gym/legged_gym/scripts/run_navigation_benchmark.py \
+   --scene random_corridor_medium \
+   --methods fmm_fixed fmm_soft mppi \
+   --seed-start 20261000 --num-seeds 30 --vio ideal \
+-  --output /home/fabu/HIMLoco/assets/runs/navigation_benchmark/ch3_medium_30seed_20260924 \
++  --output /home/hzz/project/HIMLoco/assets/runs/navigation_benchmark/ch3_medium_30seed_20260924 \
+   --resume
+ ```
+ 
+ 看到`Results: .../ch3_medium_30seed_20260924`才表示90个任务全部结束。若中途再次关机，先按
+ `Ctrl+C`停止，下一次执行完全相同的命令即可继续。
+ 
+-## 3. 运行困难档
++## 3. 复现或续跑困难档
+ 
+-困难档为`20大石+4棵树+400小碎石`，目前尚未开始。
++困难档为`20大石+4棵树+400小碎石`，现已完成90/90。
+ 
+ ```bash
+ python legged_gym/legged_gym/scripts/run_navigation_benchmark.py \
+   --scene random_corridor_hard \
+   --methods fmm_fixed fmm_soft mppi \
+   --seed-start 20261000 --num-seeds 30 --vio ideal \
+-  --output /home/fabu/HIMLoco/assets/runs/navigation_benchmark/ch3_hard_30seed_20260924
++  --output /home/hzz/project/HIMLoco/assets/runs/navigation_benchmark/ch3_hard_30seed_20260924 \
++  --resume
+ ```
+ 
+ 若困难档中途停止，重新执行上面的命令并在末尾添加`--resume`。
+@@ -51,13 +52,13 @@ python legged_gym/legged_gym/scripts/run_navigation_benchmark.py \
+ 
+ ```bash
+ python legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py \
+-  /home/fabu/HIMLoco/assets/runs/navigation_benchmark/ch3_medium_30seed_20260924
++  /home/hzz/project/HIMLoco/assets/runs/navigation_benchmark/ch3_medium_30seed_20260924
+ 
+ python legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py \
+-  /home/fabu/HIMLoco/assets/runs/navigation_benchmark/ch3_hard_30seed_20260924
++  /home/hzz/project/HIMLoco/assets/runs/navigation_benchmark/ch3_hard_30seed_20260924
+ ```
+ 
+-分析脚本会生成`statistical_analysis.json`和`statistical_analysis.md`，并进行30-seed配对检验。
++分析脚本会生成`statistical_analysis.json`和`paper_table.csv`，并进行30-seed配对检验。
+ 若同一seed下三种方法的障碍布局哈希不同，脚本会直接报错，不应使用该组结果。
+ 
+ ## 5. 完整性检查
+@@ -65,7 +66,7 @@ python legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py \
+ 对中等档执行：
+ 
+ ```bash
+-cd /home/fabu/HIMLoco
++cd /home/hzz/project/HIMLoco
+ find assets/runs/navigation_benchmark/ch3_medium_30seed_20260924 \
+   -maxdepth 1 -name '*_seed*.json' | wc -l
+ find assets/runs/navigation_benchmark/ch3_medium_30seed_20260924 \
+@@ -84,6 +85,10 @@ grep -l 'headless 下无法创建相机' \
+ 总变差、角速度符号翻转次数、平均/P95规划耗时、能耗、最小净空、碰撞与脱困次数。成功率
+ 使用同seed的McNemar精确检验；连续指标只在双方共同成功seed上使用Wilcoxon配对检验。
+ 
+-简单档已完成90/90：固定FMM为17/30，软代价FMM为24/30，MPPI为25/30；数据目录为
+-`assets/runs/navigation_benchmark/ch3_easy_30seed_20260924/`。中等和困难档必须采用同一套流程，
+-不得依据中途结果调整参数、删除困难seed或更换成功判据。
++三档均已完成90/90。成功数分别为：简单档固定膨胀FMM 17、双层代价FMM 24、MPPI 25；中等档
++10、10、20；困难档3、5、14。三档必须采用同一套流程，不得依据结果调整参数、删除困难
++seed或更换成功判据。
++
++简单档运行于RTX 3080 Ti；中等档前4个seed来自RTX 3080 Ti，其余来自RTX 4060；困难档
++运行于RTX 4060。因此规划耗时只适合在同一难度内部比较三种方法，不应直接跨难度解释绝对
++耗时变化。论文若要求三档规划耗时严格可比，应在同一机器上重跑全部三档。
+diff --git a/legged_gym/legged_gym/envs/go2/pathplanner.py b/legged_gym/legged_gym/envs/go2/pathplanner.py
+index 40e368e..f37d75a 100644
+--- a/legged_gym/legged_gym/envs/go2/pathplanner.py
++++ b/legged_gym/legged_gym/envs/go2/pathplanner.py
+@@ -17,6 +17,11 @@ from legged_gym.envs.go2.bev_height_mapper import BEVMapper,FMMGradientControlle
+ from legged_gym.envs.go2.bev_height_mapper import plot_all_trials,plot_all_saved_trajectories
+ from legged_gym.envs.go2.rrt_planner import RRTController
+ from legged_gym.envs.go2.a_star_dwa_planner import AStarDWAController
++from legged_gym.envs.go2.paper_baseline_planners import (
++    PatternSearchDWAController,
++    SafeAPFController,
++)
++from legged_gym.envs.go2.iplanner_controller import IPlannerController
+ from legged_gym.envs.go2.mppi_local_planner import (
+     FootprintMPPIController,
+     WorldObstacleMemory,
+@@ -246,13 +251,43 @@ class Evaluator:
+                 inflate_radius_m=RRT_INFLATE_RADIUS_M,
+                 goal_min_forward_m=FMM_GOAL_MIN_FORWARD_M,
+             )
+-        elif self.mode == 'astar_dwa': # 新增
+-            self.fmm = AStarDWAController(
++        elif self.mode in ('astar_dwa', 'ps_dwa'):
++            dwa_class = (PatternSearchDWAController
++                         if self.mode == 'ps_dwa' else AStarDWAController)
++            self.fmm = dwa_class(
+                 bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
+                 max_vx=DWA_MAX_VX, max_wz=DWA_MAX_WZ,
+                 max_acc_vx=DWA_MAX_ACC_VX, max_acc_wz=DWA_MAX_ACC_WZ,
+                 dt=DWA_DT, predict_time=DWA_PREDICT_TIME,
+                 inflate_radius_m=DWA_INFLATE_RADIUS_M,
++                **({'max_evaluations': PS_DWA_MAX_EVALUATIONS}
++                   if self.mode == 'ps_dwa' else {}),
++            )
++        elif self.mode == 'sapf':
++            self.fmm = SafeAPFController(
++                bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
++                max_vx=SAPF_MAX_VX, max_wz=SAPF_MAX_WZ,
++                yaw_k=SAPF_YAW_K,
++                safe_distance_m=SAPF_SAFE_DISTANCE_M,
++                vortex_distance_m=SAPF_VORTEX_DISTANCE_M,
++                influence_distance_m=SAPF_INFLUENCE_DISTANCE_M,
++                attraction_gain=SAPF_ATTRACTION_GAIN,
++                repulsion_gain=SAPF_REPULSION_GAIN,
++            )
++        elif self.mode == 'iplanner':
++            self.fmm = IPlannerController(
++                model_path=IPLANNER_MODEL_PATH,
++                runtime_dir=IPLANNER_RUNTIME_DIR,
++                bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
++                max_goal_distance_m=IPLANNER_MAX_GOAL_DISTANCE_M,
++                max_vx=IPLANNER_MAX_VX,
++                max_wz=IPLANNER_MAX_WZ,
++                yaw_k=IPLANNER_YAW_K,
++                lookahead_m=IPLANNER_LOOKAHEAD_M,
++                fear_threshold=IPLANNER_FEAR_THRESHOLD,
++                fear_buffer_size=IPLANNER_FEAR_BUFFER_SIZE,
++                fear_speed_m_s=IPLANNER_FEAR_SPEED_M_S,
++                device=IPLANNER_DEVICE,
+             )
+         else:
+             raise ValueError("unknown planner mode: %r" % self.mode)
+@@ -287,7 +322,7 @@ class Evaluator:
+         self._camera_vis_depth = None
+         if SAVE_BEV_FMM_IMAGES:
+             os.makedirs(SAVE_BEV_FMM_DIR, exist_ok=True)
+-            for subdir in ("height", "obstacles", "potential"):
++            for subdir in ("height", "obstacles", "soft_cost", "potential"):
+                 os.makedirs(os.path.join(SAVE_BEV_FMM_DIR, subdir), exist_ok=True)
+         if SAVE_TRIAL_ROUTE_IMAGE:
+             os.makedirs(SAVE_TRIAL_ROUTE_DIR, exist_ok=True)
+@@ -353,6 +388,7 @@ class Evaluator:
+         self._mppi_active = False
+         self._cached_mppi_cmd = (float(NAV_FORWARD_VX), 0.0)
+         self._cached_raw_path = []
++        self._last_depth_pos = None
+         self._planner_reachable = True
+         self.trial_step_times = []  # 必须初始化，否则 A* 报错
+         self.trial_total_length = 0
+@@ -442,10 +478,18 @@ class Evaluator:
+ 
+             # 4) FMM：重规划周期独立配置。当前按用户观感恢复到 50Hz；深度图
+             # 仍以 12.5Hz 更新，但机器人位姿与局部目标每个控制步都会变化。
+-            replan_interval = max(1, int(FMM_REPLAN_INTERVAL_STEPS))
++            if self.mode == 'iplanner':
++                planner_interval = IPLANNER_REPLAN_INTERVAL_STEPS
++            elif self.mode == 'ps_dwa':
++                planner_interval = PS_DWA_REPLAN_INTERVAL_STEPS
++            else:
++                planner_interval = FMM_REPLAN_INTERVAL_STEPS
++            replan_interval = max(1, int(planner_interval))
+             plan_due = step == 0 or step % replan_interval == 0
+             if plan_due:
+                 self.fmm.set_goal((dx_r, dy_r))
++                if self.mode == 'iplanner':
++                    self.fmm.set_depth(self._last_depth_pos)
+                 start_plan_t = time.time()
+                 self.fmm.update(occ_bev)
+                 self.trial_step_times.append((time.time() - start_plan_t) * 1000)
+@@ -477,6 +521,8 @@ class Evaluator:
+ 
+             wz = self.fmm.compute_wz()
+             planner_vx = None
++            if self.mode in ('sapf', 'ps_dwa', 'iplanner'):
++                planner_vx = self.fmm.compute_vx()
+             if self.mppi is not None:
+                 obstacle_active = bool(np.any(occ_bev))
+                 if obstacle_active:
+@@ -1351,7 +1397,9 @@ class Evaluator:
+         fig.savefig(save_path, dpi=180, bbox_inches="tight")
+         plt.close(fig)
+ 
+-    def _save_bev_fmm_separate_images(self, trial_id, step, hr, obstacle_rgb, potential, occ_bev, path_xy, smooth_xy, extent_m):
++    def _save_bev_fmm_separate_images(self, trial_id, step, hr, obstacle_rgb,
++                                      soft_cost, potential, occ_bev, path_xy,
++                                      smooth_xy, extent_m):
+         self._save_bev_fmm_single_panel(
+             "height",
+             trial_id,
+@@ -1370,6 +1418,18 @@ class Evaluator:
+             path_xy,
+             smooth_xy,
+         )
++        if soft_cost is not None:
++            self._save_bev_fmm_single_panel(
++                "soft_cost",
++                trial_id,
++                step,
++                "Soft Cost",
++                lambda ax: ax.imshow(
++                    soft_cost, origin="lower", extent=extent_m, cmap="magma",
++                    vmin=0.0, vmax=1.0, interpolation="nearest", aspect="auto"),
++                path_xy,
++                smooth_xy,
++            )
+         if BEV_FMM_SHOW_POTENTIAL:
+             def draw_potential(ax):
+                 if potential is not None:
+@@ -1404,6 +1464,9 @@ class Evaluator:
+         path_xy = self._path_rc_to_plot_xy(path_rc)
+         smooth_xy = self._smooth_plot_path(path_xy)
+         potential = self._format_fmm_potential()
++        soft_cost = getattr(self.fmm, "soft_cost_map", None)
++        if soft_cost is not None:
++            soft_cost = np.asarray(soft_cost, dtype=np.float32)
+ 
+         obstacle_rgb = np.ones((*occ_bev.shape, 3), dtype=np.float32)
+         obstacle_rgb[occ_bev > 0] = np.array([0.18, 0.18, 0.18], dtype=np.float32)
+@@ -1462,6 +1525,7 @@ class Evaluator:
+                 step,
+                 hr,
+                 obstacle_rgb,
++                soft_cost,
+                 potential,
+                 occ_bev,
+                 path_xy,
+@@ -2012,7 +2076,8 @@ class Evaluator:
+             "scene_seed": int(SCENE_RANDOM_SEED_BASE),
+             "planner_mode": self.mode,
+             "temporal_memory": bool(self._use_temporal_memory),
+-            "soft_cost": bool(FMM_USE_SOFT_COST),
++            "soft_cost": (bool(FMM_USE_SOFT_COST)
++                          if self.mode in ('fmm', 'mppi') else None),
+             "actor_truth_whitelist": bool(BEV_OBSTACLE_ACTORS_ONLY),
+             "vio_noise_level": VIO_NOISE_LEVEL,
+             "elapsed_s": float(elapsed_time),
+diff --git a/legged_gym/legged_gym/envs/go2/viz_config.py b/legged_gym/legged_gym/envs/go2/viz_config.py
+index e77540b..136dc1e 100644
+--- a/legged_gym/legged_gym/envs/go2/viz_config.py
++++ b/legged_gym/legged_gym/envs/go2/viz_config.py
+@@ -7,7 +7,7 @@ go2 可视化与输出统一配置
+ 
+ 【手动运行命令】以下命令均从 legged_gym 工作目录执行，可直接复制到终端。
+ 
+-    cd /home/fabu/HIMLoco/legged_gym
++    cd /home/hzz/project/HIMLoco/legged_gym
+     conda activate himloco
+     export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+ 
+@@ -36,6 +36,10 @@ go2 可视化与输出统一配置
+     HIMLOCO_NUM_TRIALS=10 \
+     python legged_gym/scripts/play1.py --task=go2
+ 
++    # 4. 近年论文方法：同一seed分别观察SAPF与PS-DWA。
++    HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=random_corridor_easy HIMLOCO_PLANNER_MODE=sapf HIMLOCO_SCENE_SEED=20261000 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
++    HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=random_corridor_easy HIMLOCO_PLANNER_MODE=ps_dwa HIMLOCO_SCENE_SEED=20261000 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
++
+ 【常用命令参数】把需要的变量放在 python 命令前；未写的使用本文件默认值。
+ 
+     HIMLOCO_PRESET=viewer_only       # 开窗口观察，不保存论文图片
+@@ -49,6 +53,9 @@ go2 可视化与输出统一配置
+     HIMLOCO_SCENE_PRESET=empty       # 平地且无障碍，仅检查步态/控制
+     HIMLOCO_PLANNER_MODE=mppi        # MPPI 局部规划器（当前推荐）
+     HIMLOCO_PLANNER_MODE=fmm         # FMM 基线，用于 A/B 对照
++    HIMLOCO_PLANNER_MODE=sapf        # SAPF安全人工势场
++    HIMLOCO_PLANNER_MODE=ps_dwa      # 模式搜索DWA（A*提供局部参考路径）
++    HIMLOCO_PLANNER_MODE=iplanner    # RSS 2023 iPlanner官方预训练网络
+     HIMLOCO_NUM_TRIALS=10            # 本进程实验次数；肉眼查看建议设为 1
+     HIMLOCO_SCENE_SEED=20260922      # 随机种子；A/B 对照必须保持一致
+     HIMLOCO_TEMPORAL_MEMORY=0        # 默认关闭；1 仅用于已否决的记忆负消融
+@@ -66,6 +73,7 @@ go2 可视化与输出统一配置
+     python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_easy --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
+     python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_medium --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
+     python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_hard --methods fmm_fixed fmm_soft mppi --seed-start 20261000 --num-seeds 30 --vio ideal
++    python legged_gym/scripts/run_navigation_benchmark.py --scene random_corridor_easy --methods sapf ps_dwa --seed-start 20261000 --num-seeds 30 --vio ideal
+ 
+     # 单行写法示例（效果与多行命令相同）：
+     HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=narrow_gate HIMLOCO_PLANNER_MODE=mppi HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
+@@ -523,7 +531,7 @@ RESULT_JSON_PATH = os.environ.get("HIMLOCO_RESULT_JSON", "").strip()
+ NAV_EPISODE_LENGTH_S = 60.0  #: 24m 随机走廊含绕障，30~45s 容易把正常绕行误判超时
+ RENDER = True           #: 是否开 IsaacGym viewer 窗口
+ PLANNER_MODE = os.environ.get("HIMLOCO_PLANNER_MODE", "mppi").strip().lower()
+-#: 高层规划器："fmm"(基线) / "mppi"(FMM走廊+足迹MPPI) / "rrt" / "astar_dwa"
++#: 高层规划器："fmm" / "mppi" / "rrt" / "astar_dwa" / "sapf" / "ps_dwa" / "iplanner"
+ #: 导航目标点（世界坐标），论文用的是 4 个点：A/B/C + 终点
+ WAYPOINTS = [
+     (11.0, 8.0),
+@@ -635,7 +643,8 @@ POLICY_EXPERIMENT_NAME = "rough_go2"   #: logs/ 下的实验名（对应 runner.
+ #: 留空 = 默认 logs/<experiment_name>；也可填绝对路径的 log_root
+ POLICY_LOG_ROOT = os.path.join(LOGS_ROOT, POLICY_EXPERIMENT_NAME)
+ #: 该实验下当前唯一训练到 1200 迭代的 run（其余都是 2~60 迭代的冒烟测试）
+-POLICY_LOAD_RUN = os.path.join(LOGS_ROOT, "Dec10_20-00-07_")
++POLICY_LOAD_RUN = os.path.join(
++    LOGS_ROOT, "go2_new_reward", "Dec10_20-00-07_")
+ #: -1 = 取该 run 里编号最大的 model_*.pt；填数字则取 model_<N>.pt
+ POLICY_CHECKPOINT = 1200
+ 
+@@ -1150,7 +1159,7 @@ def check_consistency(verbose=True):
+     """
+     problems = []
+     notes = []
+-    if PLANNER_MODE not in ("fmm", "mppi", "rrt", "astar_dwa"):
++    if PLANNER_MODE not in ("fmm", "mppi", "rrt", "astar_dwa", "sapf", "ps_dwa", "iplanner"):
+         problems.append("PLANNER_MODE=%r 不受支持" % PLANNER_MODE)
+     if MPPI_HORIZON < 2 or MPPI_NUM_SAMPLES < 2:
+         problems.append("MPPI_HORIZON 和 MPPI_NUM_SAMPLES 必须都 >= 2")
+@@ -1773,6 +1782,41 @@ DWA_DT = 0.1                    #: 预测步长 [s]
+ DWA_PREDICT_TIME = 1.2          #: 预测时域 [s]
+ DWA_INFLATE_RADIUS_M = 0.25     #: 撞墙时可上调至 0.3
+ 
++# ---------- 近年论文对比方法（统一 BEV / 底层控制下的本地实现）----------
++# SAPF: Safe Artificial Potential Field, IEEE RA-L 2023。
++SAPF_MAX_VX = 1.0
++SAPF_MAX_WZ = 1.0
++SAPF_YAW_K = 2.0
++SAPF_SAFE_DISTANCE_M = 0.30
++SAPF_VORTEX_DISTANCE_M = 0.70
++SAPF_INFLUENCE_DISTANCE_M = 1.20
++SAPF_ATTRACTION_GAIN = 1.0
++SAPF_REPULSION_GAIN = 0.035
++
++# PS-DWA: Pattern Search Dynamic Window Approach, AM&A 2025。
++# 保留相同的 DWA 运动学、评价函数和 A* 参考路径，只替换速度空间搜索器。
++PS_DWA_MAX_EVALUATIONS = 40
++PS_DWA_REPLAN_INTERVAL_STEPS = 4  #: 12.5 Hz，接近DWA的0.1 s模型步长并同步感知
++
++# ---------- iPlanner（RSS 2023官方网络与预训练权重）----------
++_HIMLOCO_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
++IPLANNER_MODEL_PATH = os.environ.get(
++    "HIMLOCO_IPLANNER_MODEL",
++    os.path.join(_HIMLOCO_REPO_ROOT, "assets/checkpoints/iplanner/plannernet.pt"))
++IPLANNER_RUNTIME_DIR = os.environ.get(
++    "HIMLOCO_IPLANNER_RUNTIME",
++    os.path.join(_HIMLOCO_REPO_ROOT, "third_party/iplanner_runtime"))
++IPLANNER_DEVICE = os.environ.get("HIMLOCO_IPLANNER_DEVICE", "cuda")
++IPLANNER_REPLAN_INTERVAL_STEPS = 4  #: 与12.5 Hz深度更新同步，避免重复推理同一帧
++IPLANNER_MAX_GOAL_DISTANCE_M = 6.0  #: 与所有局部BEV方法使用相同规划视野
++IPLANNER_MAX_VX = 1.0
++IPLANNER_MAX_WZ = 1.0
++IPLANNER_YAW_K = 2.0
++IPLANNER_LOOKAHEAD_M = 0.8
++IPLANNER_FEAR_THRESHOLD = 0.5
++IPLANNER_FEAR_BUFFER_SIZE = 10
++IPLANNER_FEAR_SPEED_M_S = 0.15
++
+ # ---------- 底层下发的速度指令 ----------
+ #: play1.py 导航时下发的 vx 上限（无障碍时按此速度走）。原代码写死 1.0。
+ NAV_FORWARD_VX = 1.0
+@@ -2044,6 +2088,23 @@ PRESETS = {
+         LEG_CLOSEUP_CAPTURE=False, RECORD_FRAMES=False,
+         RENDER=True,
+     ),
++    # 论文原始素材采集：同时保存 RGB/Depth、BEV 各层、势场与场景总览。
++    # 建议仅跑单次代表性 trial，并用 HIMLOCO_CAPTURE_ROOT 隔离输出目录。
++    "paper_capture": dict(
++        SAVE_CAMERA_IMAGES=True, SAVE_RGB_IMAGE=True, SAVE_DEPTH_IMAGE=True,
++        SAVE_CAMERA_IMAGE_INTERVAL=50,
++        SAVE_BEV_FMM_IMAGES=True, SAVE_BEV_FMM_INTERVAL=25,
++        SAVE_BEV_FMM_MAX_PER_TRIAL=80, BEV_FMM_SHOW_POTENTIAL=True,
++        SAVE_TRIAL_ROUTE_IMAGE=True, SAVE_TRIAL_ROUTE_LOCAL_FMM_SEGMENTS=True,
++        SAVE_TRAJECTORY_NPY=True, SAVE_SUMMARY_TRAJECTORY_PLOT=True,
++        LIVE_SHOW_CAMERA_IMAGES=False, LIVE_SHOW_BEV_FMM_WINDOW=False,
++        LIVE_DRAW_VIEWER_OVERLAY=True, LIVE_DRAW_WAYPOINTS=True,
++        LIVE_DRAW_TRAJECTORY=True, LIVE_DRAW_FMM_PATH=True,
++        LIVE_FOLLOW_VIEWER_CAMERA=False, LIVE_HOLD_FINAL_ROUTE=False,
++        LIVE_VIEWER_SYNC=False, LIVE_DRAW_INTERVAL=1,
++        LEG_CLOSEUP_CAPTURE=False, RECORD_FRAMES=False,
++        RENDER=True,
++    ),
+     # 全开：调试用，最慢。同样需要相机（要存 RGB/Depth + 三联图）。
+     "all": dict(
+         SAVE_CAMERA_IMAGES=True, SAVE_RGB_IMAGE=True, SAVE_DEPTH_IMAGE=True,
+@@ -2143,13 +2204,22 @@ def apply_preset(name):
+ 
+ apply_preset(ACTIVE_PRESET)
+ 
++# 为论文素材采集提供独立输出根目录，避免覆盖或混入历史图片。
++_CAPTURE_ROOT = os.environ.get("HIMLOCO_CAPTURE_ROOT", "").strip()
++if _CAPTURE_ROOT:
++    SAVE_CAMERA_IMAGE_DIR = os.path.join(_CAPTURE_ROOT, "camera")
++    SAVE_BEV_FMM_DIR = os.path.join(_CAPTURE_ROOT, "bev_fmm")
++    SAVE_TRIAL_ROUTE_DIR = os.path.join(_CAPTURE_ROOT, "trial_route")
++    SAVE_TRAJECTORY_DIR = os.path.join(_CAPTURE_ROOT, "trajectories")
++    SAVE_SUMMARY_TRAJECTORY_PLOT_DIR = os.path.join(_CAPTURE_ROOT, "summary")
++
+ 
+ def ensure_dirs():
+     """按当前开关，预先把需要的输出目录建好。"""
+     needed = []
+     if SAVE_BEV_FMM_IMAGES:
+         needed.append(SAVE_BEV_FMM_DIR)
+-        for sub in ("height", "obstacles", "potential"):
++        for sub in ("height", "obstacles", "soft_cost", "potential"):
+             needed.append(os.path.join(SAVE_BEV_FMM_DIR, sub))
+     if SAVE_TRIAL_ROUTE_IMAGE:
+         needed.append(SAVE_TRIAL_ROUTE_DIR)
+diff --git a/legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py b/legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py
+index 73860b7..74a1c80 100644
+--- a/legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py
++++ b/legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py
+@@ -20,6 +20,17 @@ EFFICIENCY_METRICS = (
+     "min_path_clearance_m",
+ )
+ 
++METHOD_DISPLAY_NAMES = {
++    "fmm_fixed": "固定膨胀FMM",
++    "fmm_soft": "双层代价FMM",
++    "mppi": "双层代价FMM引导的足迹MPPI",
++    "mppi_memory": "时序记忆+双层代价FMM引导的足迹MPPI",
++    "astar_dwa": "A*+DWA",
++    "sapf": "SAPF",
++    "ps_dwa": "PS-DWA",
++    "iplanner": "iPlanner",
++}
++
+ 
+ def wilson_interval(successes, trials, z=1.959963984540054):
+     if trials <= 0:
+@@ -37,7 +48,11 @@ def exact_mcnemar_p(reference_only, other_only):
+     discordant = reference_only + other_only
+     if discordant == 0:
+         return 1.0
+-    tail = sum(math.comb(discordant, k) for k in range(
++    # math.comb was added in Python 3.8; Isaac Gym here uses Python 3.7.
++    def combination(n, k):
++        return math.factorial(n) // (math.factorial(k) * math.factorial(n - k))
++
++    tail = sum(combination(discordant, k) for k in range(
+         min(reference_only, other_only) + 1)) / float(2 ** discordant)
+     return min(1.0, 2.0 * tail)
+ 
+@@ -105,6 +120,7 @@ def analyze(records, reference="mppi"):
+             categories[category] = categories.get(category, 0) + 1
+         row = {
+             "method": method,
++            "method_display_name": METHOD_DISPLAY_NAMES.get(method, method),
+             "trials": len(method_records),
+             "successes": len(successes),
+             "success_rate": len(successes) / float(len(method_records)),
+@@ -115,7 +131,7 @@ def analyze(records, reference="mppi"):
+         for metric in EFFICIENCY_METRICS:
+             values = [float(record[metric]) for record in successes
+                       if isinstance(record.get(metric), (int, float))]
+-            row[metric + "_mean"] = statistics.fmean(values) if values else None
++            row[metric + "_mean"] = statistics.mean(values) if values else None
+             row[metric + "_std"] = statistics.pstdev(values) if len(values) > 1 else (
+                 0.0 if values else None)
+         method_stats.append(row)
+@@ -160,9 +176,9 @@ def analyze(records, reference="mppi"):
+                 p_value = None
+             comparison["metrics"][metric] = {
+                 "n": len(pairs),
+-                "reference_mean": statistics.fmean(reference_values),
+-                "other_mean": statistics.fmean(other_values),
+-                "mean_difference": statistics.fmean(
++                "reference_mean": statistics.mean(reference_values),
++                "other_mean": statistics.mean(other_values),
++                "mean_difference": statistics.mean(
+                     ref - candidate for ref, candidate in pairs),
+                 "wilcoxon_p": p_value,
+             }
+@@ -183,6 +199,7 @@ def write_outputs(analysis, root):
+     for item in analysis["methods"]:
+         table.append({
+             "method": item["method"],
++            "method_display_name": item["method_display_name"],
+             "successes": item["successes"],
+             "trials": item["trials"],
+             "success_rate": item["success_rate"],
+@@ -204,11 +221,19 @@ def write_outputs(analysis, root):
+ def main():
+     parser = argparse.ArgumentParser()
+     parser.add_argument("directory", type=Path)
++    parser.add_argument(
++        "--additional-directory", type=Path, action="append", default=[],
++        help="load paired methods from another result directory without rerunning them")
+     parser.add_argument("--reference", default="mppi")
+     args = parser.parse_args()
+     records = load_trials(args.directory)
++    for directory in args.additional_directory:
++        records.extend(load_trials(directory))
+     if not records:
+         raise RuntimeError("no *_seed*.json trials found")
++    keys = [(record["method"], record["seed"]) for record in records]
++    if len(keys) != len(set(keys)):
++        raise ValueError("duplicate method+seed records across input directories")
+     analysis = analyze(records, reference=args.reference)
+     write_outputs(analysis, args.directory)
+     print(json.dumps(analysis, ensure_ascii=False, indent=2))
+diff --git a/legged_gym/legged_gym/scripts/run_navigation_benchmark.py b/legged_gym/legged_gym/scripts/run_navigation_benchmark.py
+index da5ae6f..c43be92 100644
+--- a/legged_gym/legged_gym/scripts/run_navigation_benchmark.py
++++ b/legged_gym/legged_gym/scripts/run_navigation_benchmark.py
+@@ -36,6 +36,47 @@ METHODS = {
+         "HIMLOCO_PLANNER_MODE": "astar_dwa",
+         "HIMLOCO_TEMPORAL_MEMORY": "0",
+     },
++    "sapf": {
++        "HIMLOCO_PLANNER_MODE": "sapf",
++        "HIMLOCO_TEMPORAL_MEMORY": "0",
++    },
++    "ps_dwa": {
++        "HIMLOCO_PLANNER_MODE": "ps_dwa",
++        "HIMLOCO_TEMPORAL_MEMORY": "0",
++    },
++    "iplanner": {
++        "HIMLOCO_PLANNER_MODE": "iplanner",
++        "HIMLOCO_TEMPORAL_MEMORY": "0",
++    },
++}
++
++METHOD_DISPLAY_NAMES = {
++    "fmm_fixed": "固定膨胀FMM",
++    "fmm_soft": "双层代价FMM",
++    "mppi": "双层代价FMM引导的足迹MPPI",
++    "mppi_memory": "时序记忆+双层代价FMM引导的足迹MPPI",
++    "astar_dwa": "A*+DWA",
++    "sapf": "SAPF",
++    "ps_dwa": "PS-DWA",
++    "iplanner": "iPlanner",
++}
++
++METHOD_PROVENANCE = {
++    "sapf": {
++        "paper": "Safe Artificial Potential Field, IEEE RA-L 2023",
++        "implementation": "native NumPy occupancy-grid adaptation from the paper equations",
++        "official_author_code": False,
++    },
++    "ps_dwa": {
++        "paper": "PatternSearch-Dynamic Window Approach, AM&A 2025",
++        "implementation": "native Python pattern-search adaptation of the shared A*+DWA baseline",
++        "official_author_code": False,
++    },
++    "iplanner": {
++        "paper": "iPlanner: Imperative Path Planning, RSS 2023",
++        "implementation": "official pretrained network and interpolation with a HIMLoco velocity adapter",
++        "official_author_code": True,
++    },
+ }
+ 
+ CAMERA_UNAVAILABLE_MARKER = "headless 下无法创建相机"
+@@ -69,6 +110,7 @@ def write_summary(rows, out_dir):
+                 failures[reason] = failures.get(reason, 0) + 1
+         summary = {
+             "method": method,
++            "method_display_name": METHOD_DISPLAY_NAMES.get(method, method),
+             "trials": len(method_rows),
+             "successes": len(successful),
+             "success_rate": len(successful) / float(len(method_rows)),
+@@ -84,7 +126,7 @@ def write_summary(rows, out_dir):
+             values = [float(row[metric]) for row in source
+                       if isinstance(row.get(metric), (int, float))]
+             summary[output_name + "_mean"] = (
+-                statistics.fmean(values) if values else None)
++                statistics.mean(values) if values else None)
+             summary[output_name + "_std"] = (
+                 statistics.pstdev(values) if len(values) > 1 else 0.0
+                 if values else None)
+@@ -127,6 +169,7 @@ def load_resume_records(out_dir):
+             continue
+         record.update({
+             "method": method,
++            "method_display_name": METHOD_DISPLAY_NAMES.get(method, method),
+             "seed": seed,
+             "process_returncode": returncode,
+         })
+@@ -183,6 +226,11 @@ def main():
+         "python": sys.executable,
+         "git_commit": git_commit,
+         "git_dirty": bool(git_diff),
++        "method_provenance": {
++            method: METHOD_PROVENANCE.get(method, {
++                "implementation": "HIMLoco repository implementation"
++            }) for method in args.methods
++        },
+     }
+     config_path = out_dir / "config.json"
+     if args.resume and config_path.exists():
+@@ -240,6 +288,7 @@ def main():
+                 })
+             record.update({
+                 "method": method,
++                "method_display_name": METHOD_DISPLAY_NAMES.get(method, method),
+                 "seed": seed,
+                 "process_returncode": completed.returncode,
+             })

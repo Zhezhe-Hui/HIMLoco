@@ -1,0 +1,252 @@
+ M assets/runs/navigation_benchmark/camera_guard_smoke_20260923/summary.csv
+ M assets/runs/navigation_benchmark/camera_guard_smoke_20260923/summary.json
+ M assets/runs/navigation_benchmark/camera_guard_smoke_20260923/trials.csv
+ M assets/runs/navigation_benchmark/ch3_easy_30seed_20260924/paper_table.csv
+ M assets/runs/navigation_benchmark/ch3_easy_30seed_20260924/statistical_analysis.json
+ M assets/runs/navigation_benchmark/ch3_easy_30seed_20260924/summary.csv
+ M assets/runs/navigation_benchmark/ch3_easy_30seed_20260924/summary.json
+ M assets/runs/navigation_benchmark/ch3_easy_30seed_20260924/trials.csv
+ M assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/summary.csv
+ M assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/summary.json
+ M assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/trials.csv
+ M assets/runs/navigation_benchmark/difficulty_smoke_easy_20260924/summary.csv
+ M assets/runs/navigation_benchmark/difficulty_smoke_easy_20260924/summary.json
+ M assets/runs/navigation_benchmark/difficulty_smoke_easy_20260924/trials.csv
+ M assets/runs/navigation_benchmark/difficulty_smoke_easy_fmm_20260924/summary.csv
+ M assets/runs/navigation_benchmark/difficulty_smoke_easy_fmm_20260924/summary.json
+ M assets/runs/navigation_benchmark/difficulty_smoke_easy_fmm_20260924/trials.csv
+ M assets/runs/navigation_benchmark/difficulty_smoke_hard_20260924/summary.csv
+ M assets/runs/navigation_benchmark/difficulty_smoke_hard_20260924/summary.json
+ M assets/runs/navigation_benchmark/difficulty_smoke_hard_20260924/trials.csv
+ M assets/runs/navigation_benchmark/difficulty_smoke_medium_20260924/summary.csv
+ M assets/runs/navigation_benchmark/difficulty_smoke_medium_20260924/summary.json
+ M assets/runs/navigation_benchmark/difficulty_smoke_medium_20260924/trials.csv
+ M assets/runs/navigation_benchmark/escape_bev_screen_20260923/summary.csv
+ M assets/runs/navigation_benchmark/escape_bev_screen_20260923/summary.json
+ M assets/runs/navigation_benchmark/escape_bev_screen_20260923/trials.csv
+ M assets/runs/navigation_benchmark/flat_causal_smoke_20260923/summary.csv
+ M assets/runs/navigation_benchmark/flat_causal_smoke_20260923/summary.json
+ M assets/runs/navigation_benchmark/flat_causal_smoke_20260923/trials.csv
+ M assets/runs/navigation_benchmark/flat_planning_30seed_20260924/paper_table.csv
+ M assets/runs/navigation_benchmark/flat_planning_30seed_20260924/statistical_analysis.json
+ M assets/runs/navigation_benchmark/flat_planning_30seed_20260924/summary.csv
+ M assets/runs/navigation_benchmark/flat_planning_30seed_20260924/summary.json
+ M assets/runs/navigation_benchmark/flat_planning_30seed_20260924/trials.csv
+ M assets/runs/navigation_benchmark/formal_30seed_20260923/summary.csv
+ M assets/runs/navigation_benchmark/formal_30seed_20260923/summary.json
+ M assets/runs/navigation_benchmark/formal_30seed_20260923/trials.csv
+ M assets/runs/navigation_benchmark/formal_30seed_camera_20260923/paper_table.csv
+ M assets/runs/navigation_benchmark/formal_30seed_camera_20260923/statistical_analysis.json
+ M assets/runs/navigation_benchmark/formal_30seed_camera_20260923/summary.csv
+ M assets/runs/navigation_benchmark/formal_30seed_camera_20260923/summary.json
+ M assets/runs/navigation_benchmark/formal_30seed_camera_20260923/trials.csv
+ M assets/runs/navigation_benchmark/four_method_smoke_20260923/summary.csv
+ M assets/runs/navigation_benchmark/four_method_smoke_20260923/summary.json
+ M assets/runs/navigation_benchmark/four_method_smoke_20260923/trials.csv
+ M assets/runs/navigation_benchmark/memory_screen_20260923/summary.csv
+ M assets/runs/navigation_benchmark/memory_screen_20260923/summary.json
+ M assets/runs/navigation_benchmark/memory_screen_20260923/trials.csv
+ M assets/runs/navigation_benchmark/smoke_20260923/trials.csv
+ M assets/runs/navigation_benchmark/terrain_only_30seed_20260924/summary.csv
+ M assets/runs/navigation_benchmark/terrain_only_30seed_20260924/summary.json
+ M assets/runs/navigation_benchmark/terrain_only_30seed_20260924/trials.csv
+ M "docs/\346\257\225\344\270\232\350\256\272\346\226\207\350\247\206\350\247\211\345\257\274\350\210\252\345\256\236\346\226\275\350\267\257\347\272\277\344\270\216\345\256\236\351\252\214\350\256\260\345\275\225.md"
+ M "docs/\347\254\254\344\270\211\347\253\240\344\270\255\347\255\211\344\270\216\345\233\260\351\232\276\346\241\243\346\211\213\345\212\250\345\256\236\351\252\214\345\221\275\344\273\244.md"
+ M legged_gym/legged_gym/envs/go2/pathplanner.py
+ M legged_gym/legged_gym/envs/go2/viz_config.py
+ M legged_gym/legged_gym/scripts/analyze_navigation_benchmark.py
+ M legged_gym/legged_gym/scripts/run_navigation_benchmark.py
+?? .marscode/
+?? assets/checkpoints/
+?? assets/runs/navigation_benchmark/ch3_external_comparison_20260926/
+?? assets/runs/navigation_benchmark/ch3_external_easy_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_external_hard_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_external_medium_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_external_mppi_easy_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_external_mppi_hard_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_external_mppi_medium_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_hard_30seed_20260924/
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261004.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261004.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261005.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261005.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261006.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261006.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261007.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261007.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261008.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261008.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261009.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261009.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261010.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261010.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261011.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261011.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261012.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261012.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261013.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261013.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261014.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261014.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261015.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261015.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261016.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261016.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261017.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261017.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261018.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261018.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261019.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261019.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261020.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261020.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261021.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261021.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261022.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261022.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261023.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261023.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261024.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261024.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261025.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261025.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261026.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261026.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261027.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261027.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261028.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261028.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261029.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_fixed_seed20261029.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261004.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261004.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261005.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261005.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261006.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261006.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261007.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261007.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261008.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261008.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261009.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261009.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261010.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261010.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261011.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261011.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261012.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261012.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261013.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261013.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261014.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261014.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261015.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261015.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261016.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261016.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261017.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261017.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261018.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261018.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261019.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261019.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261020.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261020.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261021.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261021.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261022.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261022.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261023.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261023.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261024.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261024.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261025.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261025.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261026.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261026.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261027.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261027.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261028.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261028.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261029.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/fmm_soft_seed20261029.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261004.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261004.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261005.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261005.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261006.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261006.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261007.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261007.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261008.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261008.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261009.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261009.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261010.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261010.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261011.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261011.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261012.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261012.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261013.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261013.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261014.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261014.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261015.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261015.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261016.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261016.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261017.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261017.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261018.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261018.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261019.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261019.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261020.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261020.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261021.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261021.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261022.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261022.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261023.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261023.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261024.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261024.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261025.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261025.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261026.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261026.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261027.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261027.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261028.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261028.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261029.json
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/mppi_seed20261029.log
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/paper_table.csv
+?? assets/runs/navigation_benchmark/ch3_medium_30seed_20260924/statistical_analysis.json
+?? assets/runs/navigation_benchmark/ch3_paper_figures_20260925/
+?? assets/runs/navigation_benchmark/ch3_vio_ideal_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_vio_medium_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_vio_mild_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_vio_robustness_20260926/
+?? assets/runs/navigation_benchmark/ch3_vio_severe_30seed_20260926/
+?? assets/runs/navigation_benchmark/ch3_visual_evidence_20260925/
+?? assets/runs/navigation_benchmark/iplanner_screen_3seed_20260926/
+?? assets/runs/navigation_benchmark/iplanner_smoke_20260926/
+?? assets/runs/navigation_benchmark/paper_baselines_5method_screen_3seed_20260926/
+?? assets/runs/navigation_benchmark/paper_baselines_screen_3seed_20260926/
+?? assets/runs/navigation_benchmark/paper_baselines_smoke_20260926/
+?? assets/runs/navigation_benchmark/paper_baselines_smoke_v2_20260926/
+?? assets/runs/navigation_benchmark/paper_baselines_smoke_valid_20260926/
+?? assets/runs/navigation_benchmark/ps_dwa_12hz_screen_3seed_20260926/
+?? "docs/\347\241\225\345\243\253\347\240\224\347\251\266\347\224\237\345\255\246\344\275\215\344\270\255\346\234\237\346\212\245\345\221\212.md"
+?? legged_gym/legged_gym/envs/go2/iplanner_controller.py
+?? legged_gym/legged_gym/envs/go2/paper_baseline_planners.py
+?? legged_gym/legged_gym/scripts/analyze_vio_robustness.py
+?? legged_gym/legged_gym/scripts/generate_ch3_figures.py
+?? legged_gym/legged_gym/scripts/generate_ch3_visual_evidence.py
+?? legged_gym/legged_gym/scripts/generate_external_comparison_figures.py
+?? legged_gym/legged_gym/tests/test_paper_baseline_planners.py
+?? third_party/
+?? tmp/
+?? "\350\256\272\346\226\207\345\233\276\347\211\207\350\213\261\346\226\207.pdf"

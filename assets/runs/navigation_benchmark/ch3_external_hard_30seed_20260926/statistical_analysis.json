@@ -1,0 +1,237 @@
+{
+  "reference": "mppi",
+  "paired_layout_hashes_verified": true,
+  "methods": [
+    {
+      "method": "iplanner",
+      "method_display_name": "iPlanner",
+      "trials": 30,
+      "successes": 14,
+      "success_rate": 0.4666666666666667,
+      "success_ci95_low": 0.30232388907699753,
+      "success_ci95_high": 0.638577003801267,
+      "failure_categories": {
+        "success": 14,
+        "stuck": 10,
+        "collision": 5,
+        "timeout": 1
+      },
+      "elapsed_s_mean": 40.09428481810859,
+      "elapsed_s_std": 3.7899748761653838,
+      "distance_m_mean": 26.424331444102013,
+      "distance_m_std": 0.6587837007132745,
+      "cmd_wz_variation_mean": 0.01507267435641125,
+      "cmd_wz_variation_std": 0.001904506202161542,
+      "cmd_wz_sign_flips_mean": 30.0,
+      "cmd_wz_sign_flips_std": 8.68496237346895,
+      "planning_mean_ms_mean": 7.09746339425482,
+      "planning_mean_ms_std": 0.12213226153705845,
+      "energy_torque_sq_mean_mean": 810.3215593610491,
+      "energy_torque_sq_mean_std": 43.641012938441285,
+      "min_path_clearance_m_mean": null,
+      "min_path_clearance_m_std": null
+    },
+    {
+      "method": "mppi",
+      "method_display_name": "双层代价FMM引导的足迹MPPI",
+      "trials": 30,
+      "successes": 10,
+      "success_rate": 0.3333333333333333,
+      "success_ci95_low": 0.19230498083676134,
+      "success_ci95_high": 0.5121994835545616,
+      "failure_categories": {
+        "success": 10,
+        "stuck": 13,
+        "timeout": 3,
+        "collision": 4
+      },
+      "elapsed_s_mean": 44.39399900771677,
+      "elapsed_s_std": 5.014890116019149,
+      "distance_m_mean": 26.549819528436718,
+      "distance_m_std": 1.0802364850985124,
+      "cmd_wz_variation_mean": 0.013928806754437702,
+      "cmd_wz_variation_std": 0.0013527753828579511,
+      "cmd_wz_sign_flips_mean": 27.1,
+      "cmd_wz_sign_flips_std": 4.0853396431631,
+      "planning_mean_ms_mean": 5.834193747722288,
+      "planning_mean_ms_std": 0.08470755727551935,
+      "energy_torque_sq_mean_mean": 727.6445495605469,
+      "energy_torque_sq_mean_std": 44.87623708718834,
+      "min_path_clearance_m_mean": 0.43740399479866027,
+      "min_path_clearance_m_std": 0.058546942348073644
+    },
+    {
+      "method": "ps_dwa",
+      "method_display_name": "PS-DWA",
+      "trials": 30,
+      "successes": 6,
+      "success_rate": 0.2,
+      "success_ci95_low": 0.0950510717728987,
+      "success_ci95_high": 0.3730569641314825,
+      "failure_categories": {
+        "stuck": 17,
+        "success": 6,
+        "collision": 5,
+        "timeout": 2
+      },
+      "elapsed_s_mean": 46.67666562336186,
+      "elapsed_s_std": 4.213745929907961,
+      "distance_m_mean": 26.34134501276594,
+      "distance_m_std": 1.1586402087117373,
+      "cmd_wz_variation_mean": 0.011246683385423676,
+      "cmd_wz_variation_std": 0.0015423669073036154,
+      "cmd_wz_sign_flips_mean": 13.166666666666666,
+      "cmd_wz_sign_flips_std": 6.962199524735141,
+      "planning_mean_ms_mean": 40.558534728910146,
+      "planning_mean_ms_std": 5.580205606693828,
+      "energy_torque_sq_mean_mean": 680.7103271484375,
+      "energy_torque_sq_mean_std": 23.30821158962772,
+      "min_path_clearance_m_mean": null,
+      "min_path_clearance_m_std": null
+    },
+    {
+      "method": "sapf",
+      "method_display_name": "SAPF",
+      "trials": 30,
+      "successes": 1,
+      "success_rate": 0.03333333333333333,
+      "success_ci95_low": 0.005908590381612455,
+      "success_ci95_high": 0.16670390991409173,
+      "failure_categories": {
+        "stuck": 21,
+        "timeout": 7,
+        "success": 1,
+        "collision": 1
+      },
+      "elapsed_s_mean": 57.959998704493046,
+      "elapsed_s_std": 0.0,
+      "distance_m_mean": 28.715740587031178,
+      "distance_m_std": 0.0,
+      "cmd_wz_variation_mean": 0.02397268863719778,
+      "cmd_wz_variation_std": 0.0,
+      "cmd_wz_sign_flips_mean": 58.0,
+      "cmd_wz_sign_flips_std": 0.0,
+      "planning_mean_ms_mean": 3.6871216962484707,
+      "planning_mean_ms_std": 0.0,
+      "energy_torque_sq_mean_mean": 850.0803833007812,
+      "energy_torque_sq_mean_std": 0.0,
+      "min_path_clearance_m_mean": 0.3499999940395355,
+      "min_path_clearance_m_std": 0.0
+    }
+  ],
+  "paired": [
+    {
+      "reference": "mppi",
+      "other": "iplanner",
+      "reference_only_success": 2,
+      "other_only_success": 6,
+      "common_successes": 8,
+      "mcnemar_exact_p": 0.2890625,
+      "metrics": {
+        "elapsed_s": {
+          "n": 8,
+          "reference_mean": 45.64999897964299,
+          "other_mean": 39.19999912381172,
+          "mean_difference": 6.4499998558312654,
+          "wilcoxon_p": 0.0078125
+        },
+        "distance_m": {
+          "n": 8,
+          "reference_mean": 26.82427068134585,
+          "other_mean": 26.3696188423728,
+          "mean_difference": 0.4546518389730494,
+          "wilcoxon_p": 0.3125
+        },
+        "cmd_wz_variation": {
+          "n": 8,
+          "reference_mean": 0.014414718181336326,
+          "other_mean": 0.014576800909006782,
+          "mean_difference": -0.00016208272767045647,
+          "wilcoxon_p": 0.84375
+        },
+        "cmd_wz_sign_flips": {
+          "n": 8,
+          "reference_mean": 27.75,
+          "other_mean": 29.0,
+          "mean_difference": -1.25,
+          "wilcoxon_p": 0.84375
+        },
+        "planning_mean_ms": {
+          "n": 8,
+          "reference_mean": 5.844947190987212,
+          "other_mean": 7.102747975998945,
+          "mean_difference": -1.2578007850117323,
+          "wilcoxon_p": 0.0078125
+        },
+        "energy_torque_sq_mean": {
+          "n": 8,
+          "reference_mean": 732.2128219604492,
+          "other_mean": 815.3806381225586,
+          "mean_difference": -83.16781616210938,
+          "wilcoxon_p": 0.0078125
+        }
+      }
+    },
+    {
+      "reference": "mppi",
+      "other": "ps_dwa",
+      "reference_only_success": 8,
+      "other_only_success": 4,
+      "common_successes": 2,
+      "mcnemar_exact_p": 0.3876953125,
+      "metrics": {
+        "elapsed_s": {
+          "n": 2,
+          "reference_mean": 39.88999910838902,
+          "other_mean": 47.419998940080404,
+          "mean_difference": -7.529999831691384,
+          "wilcoxon_p": 0.5
+        },
+        "distance_m": {
+          "n": 2,
+          "reference_mean": 26.133726143501917,
+          "other_mean": 26.206161598187464,
+          "mean_difference": -0.07243545468554657,
+          "wilcoxon_p": 1.0
+        },
+        "cmd_wz_variation": {
+          "n": 2,
+          "reference_mean": 0.014566748555677914,
+          "other_mean": 0.012025669460360133,
+          "mean_difference": 0.0025410790953177822,
+          "wilcoxon_p": 0.5
+        },
+        "cmd_wz_sign_flips": {
+          "n": 2,
+          "reference_mean": 23.0,
+          "other_mean": 14.5,
+          "mean_difference": 8.5,
+          "wilcoxon_p": 1.0
+        },
+        "planning_mean_ms": {
+          "n": 2,
+          "reference_mean": 5.7191883809745425,
+          "other_mean": 39.72785882216459,
+          "mean_difference": -34.00867044119005,
+          "wilcoxon_p": 0.5
+        },
+        "energy_torque_sq_mean": {
+          "n": 2,
+          "reference_mean": 764.5282592773438,
+          "other_mean": 685.3594665527344,
+          "mean_difference": 79.16879272460938,
+          "wilcoxon_p": 0.5
+        }
+      }
+    },
+    {
+      "reference": "mppi",
+      "other": "sapf",
+      "reference_only_success": 10,
+      "other_only_success": 1,
+      "common_successes": 0,
+      "mcnemar_exact_p": 0.01171875,
+      "metrics": {}
+    }
+  ]
+}

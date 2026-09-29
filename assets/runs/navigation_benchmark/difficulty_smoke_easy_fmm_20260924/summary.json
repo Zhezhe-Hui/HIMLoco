@@ -28,6 +28,7 @@
     "stall_escape_count_mean": null,
     "stall_escape_count_std": null,
     "min_path_clearance_m_mean": null,
-    "min_path_clearance_m_std": null
+    "min_path_clearance_m_std": null,
+    "method_display_name": "固定膨胀FMM"
   }
 ]
