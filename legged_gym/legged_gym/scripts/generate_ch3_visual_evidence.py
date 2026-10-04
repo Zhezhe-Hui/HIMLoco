@@ -74,16 +74,16 @@ def pipeline(root, output, directory="hard_seed20261001", step=1000):
     name = "trial_01_step_%05d.png" % step
     paths = (
         (scene / "camera" / ("rgb_%06d.png" % step), "D435 RGB"),
-        (scene / "camera" / ("depth_%06d.png" % step), "D435 深度图"),
-        (scene / "bev_fmm" / "height" / name, "局部高度 BEV"),
-        (scene / "bev_fmm" / "obstacles" / name, "足迹障碍图"),
-        (scene / "bev_fmm" / "soft_cost" / name, "连续软代价图"),
-        (scene / "bev_fmm" / "potential" / name, "FMM 势场与路径"),
+        (scene / "camera" / ("depth_%06d.png" % step), "D435 Depth Image"),
+        (scene / "bev_fmm" / "height" / name, "Local Height BEV"),
+        (scene / "bev_fmm" / "obstacles" / name, "Footprint Obstacle Map"),
+        (scene / "bev_fmm" / "soft_cost" / name, "Continuous Safety Cost"),
+        (scene / "bev_fmm" / "potential" / name, "FMM Potential and Path"),
     )
     fig, axes = plt.subplots(2, 3, figsize=(12.8, 8.3))
     for ax, (path, title) in zip(axes.flat, paths):
         show_image(ax, path, title)
-    fig.suptitle("RGB-D 感知到局部规划的完整数据链（困难档，Step %d）" % step,
+    fig.suptitle("RGB-D Perception to Local Planning: Hard Terrain, Step %d" % step,
                  fontsize=14)
     fig.tight_layout()
     save(fig, output, "10_rgbd_bev_cost_planning_pipeline")

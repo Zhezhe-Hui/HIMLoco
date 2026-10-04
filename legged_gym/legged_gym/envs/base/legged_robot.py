@@ -577,21 +577,46 @@ class LeggedRobot(BaseTask):
                                                 gymtorch.unwrap_tensor(robot_indices), len(robot_indices))
 
     @staticmethod
-    def _sample_separated_xy(count, x_range, y_range, min_separation, rng=None):
-            """Uniformly sample obstacle centers with a minimum pairwise distance."""
+    def _sample_separated_xy(count, x_range, y_range, min_separation, rng=None,
+                             reserved_points=None, reserved_radius=0.0,
+                             fixed_points=None):
+            """Sample separated obstacle centers outside optional endpoint clear zones."""
             rng = np.random if rng is None else rng
-            points = []
+            fixed_values = [] if fixed_points is None else fixed_points
+            points = [np.asarray(point, dtype=np.float32)
+                      for point in fixed_values]
+            if len(points) > int(count):
+                raise ValueError("固定挡路障碍数量不能超过场景障碍总数")
+            reserved_values = [] if reserved_points is None else reserved_points
+            reserved = np.asarray(reserved_values, dtype=np.float32).reshape(-1, 2)
             attempts = 0
             max_attempts = max(1000, int(count) * 300)
             min_sep_sq = float(min_separation) ** 2
+            reserved_radius_sq = float(reserved_radius) ** 2
+            for index, point in enumerate(points):
+                if not (float(x_range[0]) <= point[0] <= float(x_range[1])
+                        and float(y_range[0]) <= point[1] <= float(y_range[1])):
+                    raise ValueError("固定挡路障碍不在随机障碍区域内: %s" % point.tolist())
+                if (reserved.shape[0] > 0
+                        and np.any(np.sum((reserved - point) ** 2, axis=1)
+                                   < reserved_radius_sq)):
+                    raise ValueError("固定挡路障碍侵入起终点净空区: %s" % point.tolist())
+                for other in points[:index]:
+                    if float(np.sum((point - other) ** 2)) < min_sep_sq:
+                        raise ValueError("固定挡路障碍间距小于 %.2fm" % min_separation)
             while len(points) < int(count) and attempts < max_attempts:
                 attempts += 1
                 candidate = np.array([
                     rng.uniform(float(x_range[0]), float(x_range[1])),
                     rng.uniform(float(y_range[0]), float(y_range[1])),
                 ], dtype=np.float32)
-                if all(float(np.sum((candidate - point) ** 2)) >= min_sep_sq
-                       for point in points):
+                outside_reserved = (
+                    reserved.shape[0] == 0
+                    or np.all(np.sum((reserved - candidate) ** 2, axis=1)
+                              >= reserved_radius_sq))
+                if (outside_reserved
+                        and all(float(np.sum((candidate - point) ** 2)) >= min_sep_sq
+                                for point in points)):
                     points.append(candidate)
             if len(points) != int(count):
                 raise RuntimeError(
@@ -1340,11 +1365,17 @@ class LeggedRobot(BaseTask):
             x_range = tuple(getattr(source_cfg, "random_spawn_x", (12.0, 24.0)))
             y_range = tuple(getattr(source_cfg, "random_spawn_y", (0.0, 12.0)))
             min_sep = float(getattr(source_cfg, "random_min_separation", 1.4))
+            reserved_points = list(getattr(source_cfg, "random_reserved_points", []))
+            reserved_radius = float(getattr(source_cfg, "random_reserved_radius", 0.0))
+            fixed_points = list(getattr(source_cfg, "random_fixed_points", []))
             seed = int(getattr(source_cfg, "random_seed", 0))
             positions = self._sample_separated_xy(
                 num_big_stones + self.num_static_obstacle_actors,
                 x_range, y_range, min_sep,
-                rng=np.random.RandomState(seed + 100000))
+                rng=np.random.RandomState(seed + 100000),
+                reserved_points=reserved_points,
+                reserved_radius=reserved_radius,
+                fixed_points=fixed_points)
             self._creation_random_stone_positions = positions[:num_big_stones]
             self._creation_random_tree_positions = positions[num_big_stones:]
             print("[legged_robot] 静态障碍在创建期随机化: seed=%d, 大石头=%d, 树=%d"
@@ -1486,6 +1517,11 @@ class LeggedRobot(BaseTask):
                 # planner runs would silently receive different small stones.
                 small_seed = int(self._stone_cfg_get("random_seed", 0)) + 200000 + i
                 small_rng = np.random.RandomState(small_seed)
+                small_reserved = np.asarray(
+                    getattr(self.cfg.stone, "random_reserved_points", []),
+                    dtype=np.float32).reshape(-1, 2)
+                small_reserved_radius_sq = float(
+                    getattr(self.cfg.stone, "random_reserved_radius", 0.0)) ** 2
 
                 # --- 1) 固定大石头（静态、带贴图）：actor 索引 1..num_big ---
                 #     保持“大石头在前、小碎石在后”的既有 actor 顺序，
@@ -1506,8 +1542,16 @@ class LeggedRobot(BaseTask):
                 # --- 2) 随机小碎石：actor 索引 num_big+1..num_stones ---
                 for s in range(num_small_stones):
                     actor_id = num_big_stones + s
-                    rx = small_rng.uniform(spawn_x_min, spawn_x_max)
-                    ry = small_rng.uniform(spawn_y_min, spawn_y_max)
+                    for _ in range(1000):
+                        rx = small_rng.uniform(spawn_x_min, spawn_x_max)
+                        ry = small_rng.uniform(spawn_y_min, spawn_y_max)
+                        if (small_reserved.shape[0] == 0
+                                or np.all(np.sum(
+                                    (small_reserved - np.array([rx, ry], dtype=np.float32)) ** 2,
+                                    axis=1) >= small_reserved_radius_sq)):
+                            break
+                    else:
+                        raise RuntimeError("无法在避开起终点后放置小碎石")
                     scale = self._quantize_stone_scale(
                         small_rng.uniform(s_min, s_max), "small")
                     terrain_z = self._get_terrain_height_at(rx, ry)

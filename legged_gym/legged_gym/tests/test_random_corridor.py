@@ -19,7 +19,8 @@ class RandomCorridorTest(unittest.TestCase):
             viz_config.SCENE_NUM_BIG_STONES,
             viz_config.SCENE_RANDOM_CORRIDOR_BIG_STONE_COUNT)
         self.assertGreater(viz_config.SCENE_NUM_BIG_STONES, 0)
-        self.assertEqual(viz_config.SCENE_TERRAIN_PRESET, "height")
+        self.assertEqual(viz_config.SCENE_TERRAIN_PRESET, "middle_height")
+        self.assertEqual(viz_config.SCENE_TERRAIN_SEQUENCE, [5, 6, 5])
         self.assertFalse(viz_config.BEV_OBSTACLE_ACTORS_ONLY)
         self.assertFalse(viz_config.TEMPORAL_MEMORY_ENABLE)
         self.assertGreaterEqual(
@@ -62,6 +63,17 @@ class RandomCorridorTest(unittest.TestCase):
         np.testing.assert_allclose(first, repeated)
         self.assertFalse(np.allclose(first, next_scene))
 
+    def test_obstacle_sampler_keeps_fixed_route_endpoints_clear(self):
+        reserved = np.asarray([(12.0, 6.0), (24.0, 6.0)])
+        radius = 1.5
+        points = np.asarray(LeggedRobot._sample_separated_xy(
+            12, (12.0, 24.0), (0.0, 12.0), 1.65,
+            rng=np.random.RandomState(20261013 + 100000),
+            reserved_points=reserved,
+            reserved_radius=radius))
+        distances = np.linalg.norm(points[:, None, :] - reserved[None, :, :], axis=2)
+        self.assertTrue(np.all(distances >= radius))
+
     def test_side_blind_turn_preset_is_reproducible(self):
         preset = viz_config.SCENE_PRESETS["side_blind_turn"]
         self.assertEqual(preset["SCENE_STONE_LAYOUT"], "side_blind_turn")
@@ -80,14 +92,14 @@ class RandomCorridorTest(unittest.TestCase):
             flat["SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL"])
         self.assertEqual(rough["NAV_RANDOM_STRAIGHT_ROUTE"],
                          flat["NAV_RANDOM_STRAIGHT_ROUTE"])
-        self.assertEqual(rough["SCENE_TERRAIN_PRESET"], "height")
+        self.assertEqual(rough["SCENE_TERRAIN_PRESET"], "middle_height")
         self.assertEqual(flat["SCENE_TERRAIN_PRESET"], "flat")
 
     def test_terrain_only_control_removes_actor_obstacles(self):
         control = viz_config.SCENE_PRESETS["random_corridor_terrain_only"]
         self.assertFalse(control["SCENE_ENABLE_STONES"])
         self.assertFalse(control["SCENE_ENABLE_TREES"])
-        self.assertEqual(control["SCENE_TERRAIN_PRESET"], "height")
+        self.assertEqual(control["SCENE_TERRAIN_PRESET"], "middle_height")
         self.assertTrue(control["NAV_RANDOM_STRAIGHT_ROUTE"])
         self.assertTrue(control["SPAWN_RANDOMIZE_EACH_TRIAL"])
 
@@ -103,10 +115,17 @@ class RandomCorridorTest(unittest.TestCase):
                 preset["SCENE_RANDOM_CORRIDOR_BIG_STONE_COUNT"], big_stones)
             self.assertEqual(len(preset["SCENE_TREE_WHITELIST"]), trees)
             self.assertEqual(preset["SCENE_NUM_SMALL_STONES"], rubble)
-            self.assertEqual(preset["SCENE_TERRAIN_PRESET"], "height")
+            self.assertEqual(preset["SCENE_TERRAIN_PRESET"], "middle_height")
             self.assertEqual(preset["SCENE_STONE_LAYOUT"], "random_corridor")
             self.assertEqual(preset["SCENE_STONE_SPAWN_X"], (12.0, 24.0))
             self.assertEqual(preset["SCENE_STONE_SPAWN_Y"], (0.0, 12.0))
+
+    def test_middle_height_sequence_is_flat_height_flat(self):
+        self.assertEqual(
+            viz_config.resolve_terrain_sequence("middle_height"),
+            [viz_config.TERRAIN_IDS["flat"],
+             viz_config.TERRAIN_IDS["height"],
+             viz_config.TERRAIN_IDS["flat"]])
 
 
 if __name__ == "__main__":

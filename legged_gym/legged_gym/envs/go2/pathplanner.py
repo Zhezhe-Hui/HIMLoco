@@ -230,7 +230,9 @@ class Evaluator:
                 self.mppi = FootprintMPPIController(
                     bev_res=BEV_RES, bev_x=BEV_X, bev_y=BEV_Y,
                     horizon=MPPI_HORIZON,
-                    num_samples=MPPI_NUM_SAMPLES,
+                    num_samples=(U_MPPI_NUM_SAMPLES
+                                 if MPPI_VARIANT == 'unscented'
+                                 else MPPI_NUM_SAMPLES),
                     rollout_dt=MPPI_ROLLOUT_DT,
                     max_vx=MPPI_MAX_VX,
                     min_vx=MPPI_MIN_VX,
@@ -241,6 +243,14 @@ class Evaluator:
                     temperature=MPPI_TEMPERATURE,
                     noise_vx=MPPI_NOISE_VX,
                     noise_wz=MPPI_NOISE_WZ,
+                    variant=MPPI_VARIANT,
+                    ut_alpha=U_MPPI_ALPHA,
+                    ut_kappa=U_MPPI_KAPPA,
+                    ut_beta=U_MPPI_BETA,
+                    ut_initial_position_var=U_MPPI_INITIAL_POSITION_VAR,
+                    ut_initial_yaw_var=U_MPPI_INITIAL_YAW_VAR,
+                    ut_risk_gamma=U_MPPI_RISK_GAMMA,
+                    ut_smoothing_window=U_MPPI_SMOOTHING_WINDOW,
                 )
         elif self.mode == 'rrt':
             self.fmm = RRTController(
@@ -1100,15 +1110,21 @@ class Evaluator:
         if self.env.cam_handle is None or self.env.camera_color_tensor is None:
             return None, None, None
 
-        center, height, span_x, span_y = self._trial_camera_setup(route_pts, traj)
+        if TRIAL_ROUTE_CAMERA_TOPDOWN_Z is not None:
+            center = np.asarray(TRIAL_ROUTE_CAMERA_TOPDOWN_CENTER_XY, dtype=np.float32)
+            height = float(TRIAL_ROUTE_CAMERA_TOPDOWN_Z)
+            half_fov = np.deg2rad(TRIAL_ROUTE_CAMERA_FOV_DEG) * 0.5
+            span_x = 2.0 * height * np.tan(half_fov)
+            span_y = span_x * float(CAM_HEIGHT) / float(CAM_WIDTH)
+        else:
+            center, height, span_x, span_y = self._trial_camera_setup(route_pts, traj)
         self._trial_route_camera_center = np.asarray(center, dtype=np.float32)
         self._trial_route_camera_height = float(height)
         self._trial_route_camera_span = np.array([span_x, span_y], dtype=np.float32)
-        cam_pos = gymapi.Vec3(
-            float(center[0]),
-            float(center[1] - TRIAL_ROUTE_CAMERA_BACK_Y_M),
-            float(height)
-        )
+        camera_y = (float(center[1]) + float(TRIAL_ROUTE_CAMERA_TOPDOWN_Y_OFFSET_M)
+                    if TRIAL_ROUTE_CAMERA_TOPDOWN_Z is not None
+                    else float(center[1] - TRIAL_ROUTE_CAMERA_BACK_Y_M))
+        cam_pos = gymapi.Vec3(float(center[0]), camera_y, float(height))
         cam_target = gymapi.Vec3(
             float(center[0]),
             float(center[1]),
@@ -1267,6 +1283,16 @@ class Evaluator:
         if np.max(rgb) <= 3:
             print("Warning: raw IsaacGym RGB image is almost black; check camera pose, lighting, or sensor rendering.")
         base_img = plt.imread(raw_path)
+
+        # Save the exact camera-projected executed trajectory for later
+        # multi-method overlay on one shared Isaac Gym frame.
+        trajectory_pixels = self._project_world_points_to_image(
+            traj, view_matrix, proj_matrix, rgb.shape)
+        if trajectory_pixels is not None and trajectory_pixels.shape[0] >= 2:
+            pixel_path = os.path.join(
+                SAVE_TRIAL_ROUTE_DIR,
+                f"trial_{trial_id:02d}_{status}_trajectory_pixels.npy")
+            np.save(pixel_path, trajectory_pixels.astype(np.float32))
 
         fig, ax = plt.subplots(figsize=(12.8, 7.2))
         ax.imshow(base_img)
@@ -2075,6 +2101,7 @@ class Evaluator:
             "scene": ACTIVE_SCENE_PRESET,
             "scene_seed": int(SCENE_RANDOM_SEED_BASE),
             "planner_mode": self.mode,
+            "mppi_variant": (MPPI_VARIANT if self.mode == 'mppi' else None),
             "temporal_memory": bool(self._use_temporal_memory),
             "soft_cost": (bool(FMM_USE_SOFT_COST)
                           if self.mode in ('fmm', 'mppi') else None),

@@ -25,6 +25,9 @@ class Go2RoughCfg( LeggedRobotCfg ):
         random_spawn_x = VIZ.SCENE_RANDOM_OBSTACLE_X
         random_spawn_y = VIZ.SCENE_RANDOM_OBSTACLE_Y
         random_min_separation = VIZ.SCENE_RANDOM_OBSTACLE_MIN_SEPARATION_M
+        random_reserved_points = VIZ.SCENE_OBSTACLE_RESERVED_POINTS
+        random_reserved_radius = VIZ.SCENE_OBSTACLE_RESERVED_RADIUS_M
+        random_fixed_points = VIZ.SCENE_ROUTE_BLOCKER_POSITIONS
         random_z_offset = VIZ.SCENE_RANDOM_TREE_Z_OFFSET
         _all_assets = [
             {
@@ -32,6 +35,7 @@ class Go2RoughCfg( LeggedRobotCfg ):
                 "file": "{LEGGED_GYM_ROOT_DIR}/resources/tree/deadwood/deadwood.urdf",
                 # HIMLOC uses global terrain coordinates, the same coordinate system as big_stone_positions.
                 "positions": [[13.0, 3.0, 0.02]],
+                # OBJ 使用 Y-up，绕 X 轴旋转 90° 后才在 Isaac Gym 中直立。
                 "rpy": [1.57079632679, 0.0, 0.0],
                 "scale": 0.5,
             },
@@ -39,8 +43,9 @@ class Go2RoughCfg( LeggedRobotCfg ):
                 "name": "oak_tree",
                 "file": "{LEGGED_GYM_ROOT_DIR}/resources/tree/oak_tree/oak_tree.urdf",
                 "positions": [[18.0, 2.0, 0.02]],
+                # 原模型高约33m，0.1倍后约3.3m，与Go2野外场景比例更合理。
                 "rpy": [1.57079632679, 0.0, 0.0],
-                "scale": 0.3,
+                "scale": 0.1,
             },
             {
                 "name": "snow_tree",
@@ -91,6 +96,9 @@ class Go2RoughCfg( LeggedRobotCfg ):
         random_spawn_x = VIZ.SCENE_RANDOM_OBSTACLE_X
         random_spawn_y = VIZ.SCENE_RANDOM_OBSTACLE_Y
         random_min_separation = VIZ.SCENE_RANDOM_OBSTACLE_MIN_SEPARATION_M
+        random_reserved_points = VIZ.SCENE_OBSTACLE_RESERVED_POINTS
+        random_reserved_radius = VIZ.SCENE_OBSTACLE_RESERVED_RADIUS_M
+        random_fixed_points = VIZ.SCENE_ROUTE_BLOCKER_POSITIONS
 
     class spawn(LeggedRobotCfg.spawn):
         """机器人出生点，全部来自 viz_config.py 第十一·B 节。"""

@@ -91,8 +91,14 @@ class BaseTask():
         # if running with a viewer, set up keyboard shortcuts and camera
         if self.headless == False:
             # subscribe to keyboard shortcuts
-            self.viewer = self.gym.create_viewer(
-                self.sim, gymapi.CameraProperties())
+            viewer_props = gymapi.CameraProperties()
+            viewer_cfg = getattr(cfg, "viewer", None)
+            if viewer_cfg is not None:
+                viewer_props.horizontal_fov = float(
+                    getattr(viewer_cfg, "horizontal_fov", viewer_props.horizontal_fov))
+                viewer_props.width = int(getattr(viewer_cfg, "width", viewer_props.width))
+                viewer_props.height = int(getattr(viewer_cfg, "height", viewer_props.height))
+            self.viewer = self.gym.create_viewer(self.sim, viewer_props)
             self.gym.subscribe_viewer_keyboard_event(
                 self.viewer, gymapi.KEY_ESCAPE, "QUIT")
             self.gym.subscribe_viewer_keyboard_event(

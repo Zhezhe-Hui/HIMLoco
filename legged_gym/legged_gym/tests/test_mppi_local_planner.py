@@ -132,6 +132,35 @@ class FootprintMPPITest(unittest.TestCase):
         changes = np.abs(np.diff([wz for _, wz in commands]))
         self.assertTrue(np.all(changes <= 0.080001))
 
+    def test_unscented_variant_propagates_finite_covariance(self):
+        controller = self.make_controller(
+            variant="unscented", num_samples=224,
+            ut_initial_position_var=0.001,
+            ut_initial_yaw_var=0.001)
+        occ = np.zeros((60, 60), dtype=np.uint8)
+        path = np.column_stack((np.linspace(0.0, 5.0, 51), np.zeros(51)))
+
+        vx, wz = controller.command(occ, path, goal_xy=(5.0, 0.0))
+
+        self.assertGreater(vx, 0.6)
+        self.assertLess(abs(wz), 0.08)
+        self.assertEqual(controller.last_state_covariance.shape, (16, 3, 3))
+        self.assertTrue(np.all(np.isfinite(controller.last_state_covariance)))
+        self.assertTrue(np.all(np.diagonal(
+            controller.last_state_covariance, axis1=1, axis2=2) >= 0.0))
+
+    def test_unscented_variant_is_deterministic_for_fixed_seed(self):
+        kwargs = dict(variant="unscented", num_samples=224, seed=13)
+        first = self.make_controller(**kwargs)
+        second = self.make_controller(**kwargs)
+        occ = np.zeros((60, 60), dtype=np.uint8)
+        occ[12:18, 29:33] = 1
+        path = np.column_stack((np.linspace(0.0, 5.0, 51),
+                                np.full(51, 0.45)))
+
+        self.assertTrue(np.allclose(
+            first.command(occ, path), second.command(occ, path), atol=1e-12))
+
 
 if __name__ == "__main__":
     unittest.main()

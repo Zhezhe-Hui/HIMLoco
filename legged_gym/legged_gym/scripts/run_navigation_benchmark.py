@@ -24,11 +24,19 @@ METHODS = {
     },
     "mppi": {
         "HIMLOCO_PLANNER_MODE": "mppi",
+        "HIMLOCO_MPPI_VARIANT": "standard",
+        "HIMLOCO_FMM_SOFT_COST": "1",
+        "HIMLOCO_TEMPORAL_MEMORY": "0",
+    },
+    "umppi": {
+        "HIMLOCO_PLANNER_MODE": "mppi",
+        "HIMLOCO_MPPI_VARIANT": "unscented",
         "HIMLOCO_FMM_SOFT_COST": "1",
         "HIMLOCO_TEMPORAL_MEMORY": "0",
     },
     "mppi_memory": {
         "HIMLOCO_PLANNER_MODE": "mppi",
+        "HIMLOCO_MPPI_VARIANT": "standard",
         "HIMLOCO_FMM_SOFT_COST": "1",
         "HIMLOCO_TEMPORAL_MEMORY": "1",
     },
@@ -54,6 +62,7 @@ METHOD_DISPLAY_NAMES = {
     "fmm_fixed": "固定膨胀FMM",
     "fmm_soft": "双层代价FMM",
     "mppi": "双层代价FMM引导的足迹MPPI",
+    "umppi": "双层代价FMM引导的足迹U-MPPI（Ours）",
     "mppi_memory": "时序记忆+双层代价FMM引导的足迹MPPI",
     "astar_dwa": "A*+DWA",
     "sapf": "SAPF",
@@ -62,6 +71,12 @@ METHOD_DISPLAY_NAMES = {
 }
 
 METHOD_PROVENANCE = {
+    "umppi": {
+        "paper": "U-MPPI, IEEE Transactions on Robotics 2025",
+        "doi": "10.1109/TRO.2025.3526078",
+        "implementation": "HIMLoco NumPy adaptation with FMM corridor and Go2 footprint",
+        "official_author_code": False,
+    },
     "sapf": {
         "paper": "Safe Artificial Potential Field, IEEE RA-L 2023",
         "implementation": "native NumPy occupancy-grid adaptation from the paper equations",
@@ -304,6 +319,16 @@ def main():
                 raise RuntimeError(
                     "Depth camera is unavailable. Do not run the visual navigation "
                     "benchmark with --headless/graphics_device_id=-1.")
+
+    # A resumed run may finish with one or more skipped trials. Persist the
+    # complete in-memory set once more so those trailing records are included.
+    if rows:
+        fields = sorted({key for row in rows for key in row})
+        with (out_dir / "trials.csv").open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(rows)
+        write_summary(rows, out_dir)
 
     print("Results: %s" % out_dir)
 

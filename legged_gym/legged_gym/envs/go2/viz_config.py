@@ -40,6 +40,14 @@ go2 可视化与输出统一配置
     HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=random_corridor_easy HIMLOCO_PLANNER_MODE=sapf HIMLOCO_SCENE_SEED=20261000 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
     HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=random_corridor_easy HIMLOCO_PLANNER_MODE=ps_dwa HIMLOCO_SCENE_SEED=20261000 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
 
+    # 5. 纯场景视角调试：机器人不动、不跑导航、不加载模型、不保存任何文件。
+    HIMLOCO_SCENE_PRESET=random_corridor_easy \
+    HIMLOCO_SCENE_SEED=20261013 \
+    HIMLOCO_ROUTE_START_X=12 HIMLOCO_ROUTE_START_Y=6 \
+    HIMLOCO_SCENE_VIEW_POS=18,5,18 \
+    HIMLOCO_SCENE_VIEW_LOOKAT=18,6,0 \
+    python legged_gym/scripts/scene_view_test.py --task=go2
+
 【常用命令参数】把需要的变量放在 python 命令前；未写的使用本文件默认值。
 
     HIMLOCO_PRESET=viewer_only       # 开窗口观察，不保存论文图片
@@ -61,9 +69,19 @@ go2 可视化与输出统一配置
     HIMLOCO_TEMPORAL_MEMORY=0        # 默认关闭；1 仅用于已否决的记忆负消融
     HIMLOCO_VIO_NOISE=ideal          # ideal/mild/medium/severe，仿真VIO误差档位
     HIMLOCO_MPPI_SAMPLES=384         # MPPI 采样数；增大更慢，通常也更稳定
+    HIMLOCO_MPPI_VARIANT=unscented   # standard=原MPPI；unscented=本文U-MPPI
+    HIMLOCO_UMPPI_SAMPLES=896        # U-MPPI总sigma-point传播数（7的倍数）
     HIMLOCO_FMM_SOFT_COST=1          # FMM 使用连续安全代价；0 为硬膨胀基线
     HIMLOCO_DEBUG_START_STEPS=30     # 输出起步阶段调试日志；0 表示关闭
     HIMLOCO_ACTOR_WHITELIST=1        # 仅诊断；使用actor真值，论文实验严禁开启
+    HIMLOCO_ROUTE_START_X=12         # 路径截图的固定起点 x
+    HIMLOCO_ROUTE_START_Y=6          # 路径截图的固定起点 y；终点自动使用同y
+    HIMLOCO_ROUTE_GOAL_X=24          # 路径截图的固定终点 x
+    HIMLOCO_ROUTE_CAMERA_X_RANGE=7,29  # 俯拍关注的世界x范围
+    HIMLOCO_ROUTE_CAMERA_Y_RANGE=0,12  # 俯拍关注的世界y范围；None为自动
+    HIMLOCO_ROUTE_CAMERA_BACK_Y=0.8    # 从正俯视沿y方向偏移量，越大越倾斜
+    HIMLOCO_ROUTE_CAMERA_FOV=90        # 截图相机水平视场角
+    HIMLOCO_CAMERA_WIDTH=640 HIMLOCO_CAMERA_HEIGHT=360  # 测试截图分辨率
 
 【侧向盲区记忆消融】同一场景分别运行：
     HIMLOCO_PRESET=viewer_only HIMLOCO_SCENE_PRESET=side_blind_turn HIMLOCO_PLANNER_MODE=mppi HIMLOCO_TEMPORAL_MEMORY=0 HIMLOCO_NUM_TRIALS=1 python legged_gym/scripts/play1.py --task=go2
@@ -122,6 +140,22 @@ def _env_int(name, default):
 def _env_float(name, default):
     raw = os.environ.get(name, "").strip()
     return float(raw) if raw else float(default)
+
+
+def _env_range(name, default, allow_none=False):
+    """Read a comma-separated numeric range such as ``7,29``."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    if allow_none and raw.lower() == "none":
+        return None
+    values = [part.strip() for part in raw.split(",")]
+    if len(values) != 2:
+        raise ValueError("%s must contain two comma-separated numbers" % name)
+    lower, upper = map(float, values)
+    if upper <= lower:
+        raise ValueError("%s upper bound must be greater than lower bound" % name)
+    return (lower, upper)
 
 # =====================================================================
 #  预设选择（只改这一行）
@@ -473,12 +507,20 @@ TRIAL_ROUTE_HIDE_SMALL_STONES_IN_CAMERA = False  #: 拍总览图时临时隐藏�
 TRIAL_ROUTE_OVERLAY_Z_OFFSET = 0.08           #: 叠加线抬高多少米，避免被地面遮挡
 
 # 总览图固定相机参数
-TRIAL_ROUTE_CAMERA_MIN_HEIGHT = 8.0           #: 最小俯拍高度（会按路线范围自动增高）
-TRIAL_ROUTE_CAMERA_FOV_DEG = 90.0             #: 视场角
-TRIAL_ROUTE_CAMERA_X_RANGE = (3.0, 27.0)      #: 横轴范围（世界坐标 x）
-TRIAL_ROUTE_CAMERA_Y_RANGE = None             #: None = 按地形宽度自动取 y 范围
-TRIAL_ROUTE_CAMERA_BACK_Y_M = -10             #: 相机沿 y 后退（轻微倾斜俯视，避免正俯视变黑）
-TRIAL_ROUTE_CAMERA_LOOKAT_Z = 0.35            #: 注视点高度
+TRIAL_ROUTE_CAMERA_MIN_HEIGHT = _env_float("HIMLOCO_ROUTE_CAMERA_MIN_HEIGHT", 8.0)
+TRIAL_ROUTE_CAMERA_FOV_DEG = _env_float("HIMLOCO_ROUTE_CAMERA_FOV", 90.0)
+TRIAL_ROUTE_CAMERA_X_RANGE = _env_range(
+    "HIMLOCO_ROUTE_CAMERA_X_RANGE", (3.0, 27.0))
+TRIAL_ROUTE_CAMERA_Y_RANGE = _env_range(
+    "HIMLOCO_ROUTE_CAMERA_Y_RANGE", None, allow_none=True)
+TRIAL_ROUTE_CAMERA_BACK_Y_M = _env_float("HIMLOCO_ROUTE_CAMERA_BACK_Y", -10.0)
+TRIAL_ROUTE_CAMERA_LOOKAT_Z = _env_float("HIMLOCO_ROUTE_CAMERA_LOOKAT_Z", 0.35)
+#: 设置 HIMLOCO_SCENE_VIEW_Z 时，路径截图与静态viewer使用同一正俯视机位。
+_TRIAL_ROUTE_TOPDOWN_Z_RAW = os.environ.get("HIMLOCO_SCENE_VIEW_Z", "").strip()
+TRIAL_ROUTE_CAMERA_TOPDOWN_Z = (
+    float(_TRIAL_ROUTE_TOPDOWN_Z_RAW) if _TRIAL_ROUTE_TOPDOWN_Z_RAW else None)
+TRIAL_ROUTE_CAMERA_TOPDOWN_CENTER_XY = (18.0, 6.0)
+TRIAL_ROUTE_CAMERA_TOPDOWN_Y_OFFSET_M = -0.2
 
 
 # =====================================================================
@@ -683,6 +725,12 @@ SCENE_RANDOM_OBSTACLE_Y = (0.0, 12.0)
 #: scale=2 大石头实际宽约 1.0m；1.65m 中心距保留约 0.65m 净缝。
 #: 原 1.4m 可能只剩 0.4m，低于 Go2 腿部动态包络，物理上不可稳定通过。
 SCENE_RANDOM_OBSTACLE_MIN_SEPARATION_M = 1.65
+# 固定路径截图时才填入；常规30-seed评测保持为空。
+SCENE_OBSTACLE_RESERVED_POINTS = []
+SCENE_OBSTACLE_RESERVED_RADIUS_M = 0.0
+#: 仅供论文路径截图使用：先放置这些必经障碍，再随机补齐该难度的其余障碍。
+#: 常规评测默认为空，因此不会改变已完成的30-seed实验协议。
+SCENE_ROUTE_BLOCKER_POSITIONS = []
 SCENE_RANDOM_TREE_Z_OFFSET = 0.02
 SCENE_RANDOM_CORRIDOR_BIG_STONE_COUNT = 20
 #: 三档论文场景使用固定的树种顺序；难度只增加数量，不替换已有树种。
@@ -725,7 +773,13 @@ TERRAIN_IDS = {
     "height":       6,   # 离散高度
     "brick":        7,   # 砖块长条障碍
 }
-#: 地形预设："custom" 用下面手写的序列；或填 TERRAIN_IDS 里的名字（如 "slope"）生成单一地形。
+#: 组合地形按行沿世界 x 方向排列。当 num_rows=3、num_cols=1 时，
+#: middle_height 对应 x=0~12m 平地、x=12~24m 离散高度、x=24~36m 平地。
+TERRAIN_SEQUENCE_PRESETS = {
+    "middle_height": [5, 6, 5],
+}
+#: 地形预设："custom" 用下面手写的序列；单一地形使用 TERRAIN_IDS 中的名字；
+#: 组合地形使用 TERRAIN_SEQUENCE_PRESETS 中的名字。
 #: 对应论文三种实验地形：height / obstacles / slope。
 SCENE_TERRAIN_PRESET = "custom"
 #: SCENE_TERRAIN_PRESET="custom" 时使用的地形序列（原 go2_config 默认值，勿随意缩短）
@@ -908,11 +962,11 @@ SCENE_PRESETS = {
         SCENE_TERRAIN_PRESET="custom", SCENE_STONE_LAYOUT="blocker",
     ),
     # 随机直线走廊：起点 (6, y), y∈[3,9]；终点 (30, y)；中段随机大石头+树。
-    # 障碍区域为世界坐标 x∈[12,24], y∈[0,12]，地形只用离散高度，不含斜坡。
+    # 障碍区域为世界坐标 x∈[12,24], y∈[0,12]；中间块为离散高度，前后两块为平地。
     "random_corridor": dict(
         SCENE_ENABLE_STONES=True, SCENE_ENABLE_BIG_STONES=True,
         SCENE_NUM_SMALL_STONES=0, SCENE_ENABLE_TREES=True,
-        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT="random_corridor",
+        SCENE_TERRAIN_PRESET="middle_height", SCENE_STONE_LAYOUT="random_corridor",
         SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
         NAV_RANDOM_STRAIGHT_ROUTE=True,
         SPAWN_RANDOMIZE_EACH_TRIAL=True,
@@ -925,7 +979,7 @@ SCENE_PRESETS = {
         SCENE_ENABLE_TREES=True,
         SCENE_TREE_WHITELIST=list(SCENE_DIFFICULTY_TREE_NAMES[:2]),
         SCENE_STONE_SPAWN_X=(12.0, 24.0), SCENE_STONE_SPAWN_Y=(0.0, 12.0),
-        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT="random_corridor",
+        SCENE_TERRAIN_PRESET="middle_height", SCENE_STONE_LAYOUT="random_corridor",
         SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
         NAV_RANDOM_STRAIGHT_ROUTE=True, SPAWN_RANDOMIZE_EACH_TRIAL=True,
     ),
@@ -935,7 +989,7 @@ SCENE_PRESETS = {
         SCENE_ENABLE_TREES=True,
         SCENE_TREE_WHITELIST=list(SCENE_DIFFICULTY_TREE_NAMES[:3]),
         SCENE_STONE_SPAWN_X=(12.0, 24.0), SCENE_STONE_SPAWN_Y=(0.0, 12.0),
-        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT="random_corridor",
+        SCENE_TERRAIN_PRESET="middle_height", SCENE_STONE_LAYOUT="random_corridor",
         SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
         NAV_RANDOM_STRAIGHT_ROUTE=True, SPAWN_RANDOMIZE_EACH_TRIAL=True,
     ),
@@ -945,7 +999,7 @@ SCENE_PRESETS = {
         SCENE_ENABLE_TREES=True,
         SCENE_TREE_WHITELIST=list(SCENE_DIFFICULTY_TREE_NAMES),
         SCENE_STONE_SPAWN_X=(12.0, 24.0), SCENE_STONE_SPAWN_Y=(0.0, 12.0),
-        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT="random_corridor",
+        SCENE_TERRAIN_PRESET="middle_height", SCENE_STONE_LAYOUT="random_corridor",
         SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=True,
         NAV_RANDOM_STRAIGHT_ROUTE=True, SPAWN_RANDOMIZE_EACH_TRIAL=True,
     ),
@@ -964,7 +1018,7 @@ SCENE_PRESETS = {
     "random_corridor_terrain_only": dict(
         SCENE_ENABLE_STONES=False, SCENE_ENABLE_BIG_STONES=False,
         SCENE_NUM_SMALL_STONES=0, SCENE_ENABLE_TREES=False,
-        SCENE_TERRAIN_PRESET="height", SCENE_STONE_LAYOUT=None,
+        SCENE_TERRAIN_PRESET="middle_height", SCENE_STONE_LAYOUT=None,
         SCENE_RANDOMIZE_OBSTACLES_EACH_TRIAL=False,
         NAV_RANDOM_STRAIGHT_ROUTE=True,
         SPAWN_RANDOMIZE_EACH_TRIAL=True,
@@ -1071,9 +1125,12 @@ def resolve_terrain_sequence(preset=None, custom=None, pad=None):
     pad = SCENE_TERRAIN_PAD if pad is None else pad
     if preset == "custom":
         return list(custom)
+    if preset in TERRAIN_SEQUENCE_PRESETS:
+        return list(TERRAIN_SEQUENCE_PRESETS[preset])
     if preset not in TERRAIN_IDS:
+        choices = sorted(list(TERRAIN_IDS.keys()) + list(TERRAIN_SEQUENCE_PRESETS.keys()))
         raise KeyError("未知地形预设: %r，可选: %s 或 'custom'"
-                       % (preset, sorted(TERRAIN_IDS.keys())))
+                       % (preset, choices))
     return [TERRAIN_IDS[preset]] * pad
 
 
@@ -1135,6 +1192,49 @@ def resolve_tree_assets(all_assets, whitelist=None):
 
 
 apply_scene_preset(ACTIVE_SCENE_PRESET)
+
+_ROUTE_BLOCKER_PATTERN = os.environ.get("HIMLOCO_ROUTE_BLOCKER_PATTERN", "").strip().lower()
+_ROUTE_BLOCKER_POSITIONS_RAW = os.environ.get(
+    "HIMLOCO_ROUTE_BLOCKER_POSITIONS", "").strip()
+_ROUTE_BLOCKER_PATTERNS = {
+    "easy": [(18.0, 6.0)],
+    "medium": [(16.5, 6.0), (20.2, 6.3)],
+    "hard": [(15.8, 6.0), (18.5, 5.3), (21.2, 6.7)],
+}
+if _ROUTE_BLOCKER_POSITIONS_RAW:
+    SCENE_ROUTE_BLOCKER_POSITIONS = [
+        tuple(float(value) for value in pair.split(","))
+        for pair in _ROUTE_BLOCKER_POSITIONS_RAW.split(";")
+    ]
+    if any(len(point) != 2 for point in SCENE_ROUTE_BLOCKER_POSITIONS):
+        raise ValueError("HIMLOCO_ROUTE_BLOCKER_POSITIONS 格式应为 x,y;x,y")
+elif _ROUTE_BLOCKER_PATTERN:
+    if _ROUTE_BLOCKER_PATTERN not in _ROUTE_BLOCKER_PATTERNS:
+        raise KeyError("未知路径截图挡路模式: %r，可选: %s"
+                       % (_ROUTE_BLOCKER_PATTERN, sorted(_ROUTE_BLOCKER_PATTERNS)))
+    SCENE_ROUTE_BLOCKER_POSITIONS = list(
+        _ROUTE_BLOCKER_PATTERNS[_ROUTE_BLOCKER_PATTERN])
+
+# 论文路径截图可用环境变量固定起终点，不改动原有30-seed评测默认值。
+_ROUTE_START_X_ENV = os.environ.get("HIMLOCO_ROUTE_START_X", "").strip()
+_ROUTE_START_Y_ENV = os.environ.get("HIMLOCO_ROUTE_START_Y", "").strip()
+_ROUTE_GOAL_X_ENV = os.environ.get("HIMLOCO_ROUTE_GOAL_X", "").strip()
+if _ROUTE_START_X_ENV or _ROUTE_START_Y_ENV or _ROUTE_GOAL_X_ENV:
+    _route_start_x = float(_ROUTE_START_X_ENV or SPAWN_RANDOM_X_RANGE[0])
+    _route_start_y = float(_ROUTE_START_Y_ENV or SPAWN_RANDOM_Y_RANGE[0])
+    _route_goal_x = float(_ROUTE_GOAL_X_ENV or NAV_STRAIGHT_GOAL_X)
+    SPAWN_RANDOMIZE_EACH_TRIAL = True
+    SPAWN_RANDOM_X_RANGE = (_route_start_x, _route_start_x)
+    SPAWN_RANDOM_Y_RANGE = (_route_start_y, _route_start_y)
+    NAV_RANDOM_STRAIGHT_ROUTE = True
+    NAV_STRAIGHT_GOAL_X = _route_goal_x
+    SCENE_OBSTACLE_RESERVED_POINTS = [
+        (_route_start_x, _route_start_y),
+        (_route_goal_x, _route_start_y),
+    ]
+    SCENE_OBSTACLE_RESERVED_RADIUS_M = _env_float(
+        "HIMLOCO_ROUTE_ENDPOINT_CLEARANCE", 1.5)
+
 _VIZ_MODULE_READY = True
 
 #: go2_config.py 直接取用的最终值（已解析，勿在此之后再改开关）
@@ -1163,6 +1263,10 @@ def check_consistency(verbose=True):
         problems.append("PLANNER_MODE=%r 不受支持" % PLANNER_MODE)
     if MPPI_HORIZON < 2 or MPPI_NUM_SAMPLES < 2:
         problems.append("MPPI_HORIZON 和 MPPI_NUM_SAMPLES 必须都 >= 2")
+    if MPPI_VARIANT not in ("standard", "unscented"):
+        problems.append("MPPI_VARIANT=%r 不受支持" % MPPI_VARIANT)
+    if U_MPPI_NUM_SAMPLES < 14:
+        problems.append("U_MPPI_NUM_SAMPLES 必须 >= 14")
     if MPPI_FOOTPRINT_LENGTH_M <= 0.0 or MPPI_FOOTPRINT_WIDTH_M <= 0.0:
         problems.append("MPPI 机身足迹长宽必须 > 0")
     if TEMPORAL_MEMORY_MAX_AGE_STEPS < 1:
@@ -1469,8 +1573,8 @@ CAM_ENABLE = True               #: 是否在 env0 上创建相机
 #:   障碍检出仅降 15%，内存降 94% —— 性价比最高，故取 320x180。
 #:   若要出论文用的高清 RGB/Depth 图，临时改回 1280x720 并调小 NUM_TRIALS，
 #:   且不要开远程桌面长时间跑。
-CAM_WIDTH = 320                 #: 图像宽 [px]
-CAM_HEIGHT = 180                #: 图像高 [px]
+CAM_WIDTH = _env_int("HIMLOCO_CAMERA_WIDTH", 320)    #: 图像宽 [px]
+CAM_HEIGHT = _env_int("HIMLOCO_CAMERA_HEIGHT", 180)  #: 图像高 [px]
 #: 水平视场角 [deg]。⚠ 必须等于 BEV_HFOV_DEG，否则深度图反投影到 BEV 会错位。
 CAM_HORIZONTAL_FOV = 90.0
 #: 初始机位（仅第一帧生效，之后每步按 base 朝向重写）
@@ -1756,6 +1860,9 @@ NARROW_PASSAGE_MAX_WZ = 0.60        #: 防止缝内急转造成后腿/机身侧�
 MPPI_REPLAN_INTERVAL_STEPS = 4      #: 12.5 Hz采样优化；控制指令仍以50 Hz下发
 MPPI_HORIZON = 20
 MPPI_NUM_SAMPLES = _env_int("HIMLOCO_MPPI_SAMPLES", 384)
+MPPI_VARIANT = os.environ.get("HIMLOCO_MPPI_VARIANT", "standard").strip().lower()
+#: U-MPPI按7个sigma-point轨迹组成一个采样锥；896次状态传播对应128个控制批次。
+U_MPPI_NUM_SAMPLES = _env_int("HIMLOCO_UMPPI_SAMPLES", 896)
 MPPI_ROLLOUT_DT = 0.10              #: 预测2秒
 MPPI_MAX_VX = 1.0
 MPPI_MIN_VX = 0.10
@@ -1766,6 +1873,14 @@ MPPI_FOOTPRINT_MARGIN_M = 0.05
 MPPI_TEMPERATURE = 8.0
 MPPI_NOISE_VX = 0.22
 MPPI_NOISE_WZ = 0.55
+#: Mohamed等T-RO 2025 U-MPPI参数；当前三维状态产生2n+1=7个sigma points。
+U_MPPI_ALPHA = _env_float("HIMLOCO_UMPPI_ALPHA", 1.0)
+U_MPPI_KAPPA = _env_float("HIMLOCO_UMPPI_KAPPA", 0.5)
+U_MPPI_BETA = _env_float("HIMLOCO_UMPPI_BETA", 2.0)
+U_MPPI_INITIAL_POSITION_VAR = _env_float("HIMLOCO_UMPPI_POS_VAR", 0.005)
+U_MPPI_INITIAL_YAW_VAR = _env_float("HIMLOCO_UMPPI_YAW_VAR", 0.005)
+U_MPPI_RISK_GAMMA = _env_float("HIMLOCO_UMPPI_RISK_GAMMA", 1.0)
+U_MPPI_SMOOTHING_WINDOW = _env_int("HIMLOCO_UMPPI_SMOOTH_WINDOW", 7)
 
 # ---------- RRT*（对比算法）----------
 RRT_MAX_WZ = 1.0
@@ -2088,6 +2203,22 @@ PRESETS = {
         LEG_CLOSEUP_CAPTURE=False, RECORD_FRAMES=False,
         RENDER=True,
     ),
+    # 论文完整路线采集：仅在 trial 结束时保存俯视场景和真实执行轨迹。
+    # 不开 viewer、不保存逐帧 RGB-D/BEV，适合对多种方法逐一复现成功路线。
+    "route_capture": dict(
+        SAVE_CAMERA_IMAGES=False, SAVE_RGB_IMAGE=False, SAVE_DEPTH_IMAGE=False,
+        SAVE_BEV_FMM_IMAGES=False,
+        SAVE_TRIAL_ROUTE_IMAGE=True, SAVE_TRIAL_ROUTE_LOCAL_FMM_SEGMENTS=False,
+        SAVE_TRAJECTORY_NPY=True, SAVE_SUMMARY_TRAJECTORY_PLOT=False,
+        LIVE_SHOW_CAMERA_IMAGES=False, LIVE_SHOW_BEV_FMM_WINDOW=False,
+        LIVE_DRAW_VIEWER_OVERLAY=False, LIVE_DRAW_WAYPOINTS=False,
+        LIVE_DRAW_TRAJECTORY=False, LIVE_DRAW_FMM_PATH=False,
+        LIVE_FOLLOW_VIEWER_CAMERA=False, LIVE_HOLD_FINAL_ROUTE=False,
+        LIVE_VIEWER_SYNC=False, LIVE_DRAW_INTERVAL=1,
+        LEG_CLOSEUP_CAPTURE=False, RECORD_FRAMES=False, MOVE_CAMERA=False,
+        METRICS_PRINT_STATS=True,
+        RENDER=False,
+    ),
     # 论文原始素材采集：同时保存 RGB/Depth、BEV 各层、势场与场景总览。
     # 建议仅跑单次代表性 trial，并用 HIMLOCO_CAPTURE_ROOT 隔离输出目录。
     "paper_capture": dict(
@@ -2250,8 +2381,9 @@ def summary():
     fmm_rate = ("FMM每步(约50Hz)" if int(FMM_REPLAN_INTERVAL_STEPS) == 1
                 else "FMM每%d步" % int(FMM_REPLAN_INTERVAL_STEPS))
     if PLANNER_MODE == "mppi":
-        planner_rate = ("模式=MPPI | %s,MPPI每%d步,世界记忆=%s" % (
-            fmm_rate, int(MPPI_REPLAN_INTERVAL_STEPS),
+        planner_name = "U-MPPI" if MPPI_VARIANT == "unscented" else "MPPI"
+        planner_rate = ("模式=%s | %s,%s每%d步,世界记忆=%s" % (
+            planner_name, fmm_rate, planner_name, int(MPPI_REPLAN_INTERVAL_STEPS),
             "开(%d步)" % int(TEMPORAL_MEMORY_MAX_AGE_STEPS)
             if TEMPORAL_MEMORY_ENABLE else "关"))
     else:

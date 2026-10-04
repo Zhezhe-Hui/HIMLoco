@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 from scipy.ndimage import distance_transform_edt
+from scipy.signal import savgol_filter
 
 
 def _wrap_angle(angle):
@@ -136,7 +137,11 @@ class FootprintMPPIController:
                  max_vx=1.0, max_wz=1.0, min_vx=0.10,
                  footprint_length_m=0.72, footprint_width_m=0.42,
                  safety_margin_m=0.05, temperature=8.0,
-                 noise_vx=0.22, noise_wz=0.55, seed=7):
+                 noise_vx=0.22, noise_wz=0.55, seed=7,
+                 variant="standard", ut_alpha=1.0, ut_kappa=0.5,
+                 ut_beta=2.0, ut_initial_position_var=0.001,
+                 ut_initial_yaw_var=0.001, ut_risk_gamma=1.0,
+                 ut_smoothing_window=7):
         self.bev_res = float(bev_res)
         self.bev_x = float(bev_x)
         self.bev_y = float(bev_y)
@@ -152,6 +157,18 @@ class FootprintMPPIController:
         self.noise_vx = float(noise_vx)
         self.noise_wz = float(noise_wz)
         self.rng = np.random.RandomState(int(seed))
+        self.variant = str(variant).strip().lower()
+        if self.variant not in ("standard", "unscented"):
+            raise ValueError("unknown MPPI variant: %r" % self.variant)
+        self.ut_alpha = float(ut_alpha)
+        self.ut_kappa = float(ut_kappa)
+        self.ut_beta = float(ut_beta)
+        self.ut_initial_position_var = float(ut_initial_position_var)
+        self.ut_initial_yaw_var = float(ut_initial_yaw_var)
+        self.ut_risk_gamma = float(ut_risk_gamma)
+        self.ut_smoothing_window = int(ut_smoothing_window)
+        if self.ut_alpha <= 0.0 or 3.0 + self.ut_kappa <= 0.0:
+            raise ValueError("invalid unscented-transform scaling parameters")
 
         length = float(footprint_length_m) + 2.0 * float(safety_margin_m)
         width = float(footprint_width_m) + 2.0 * float(safety_margin_m)
@@ -164,6 +181,7 @@ class FootprintMPPIController:
         self.last_best_cost = float("inf")
         self.last_collision_fraction = 0.0
         self.last_plan = np.zeros((0, 3), dtype=np.float64)
+        self.last_state_covariance = np.zeros((0, 3, 3), dtype=np.float64)
 
     def _make_footprint_points(self, length, width):
         # Dense perimeter plus center/front-center catches both side-swipe and head-on contact.
@@ -186,6 +204,7 @@ class FootprintMPPIController:
         self.last_best_cost = float("inf")
         self.last_collision_fraction = 0.0
         self.last_plan = np.zeros((0, 3), dtype=np.float64)
+        self.last_state_covariance = np.zeros((0, 3, 3), dtype=np.float64)
 
     def _path_targets(self, path_xy):
         path = np.asarray(path_xy, dtype=np.float64)
@@ -202,8 +221,9 @@ class FootprintMPPIController:
         targets[:, 1] = np.interp(travel, cumulative, path[:, 1])
         return targets
 
-    def _sample_controls(self, desired_heading):
-        noise = self.rng.normal(size=(self.num_samples, self.horizon, 2))
+    def _sample_controls(self, desired_heading, count=None):
+        count = self.num_samples if count is None else int(count)
+        noise = self.rng.normal(size=(count, self.horizon, 2))
         noise[:, :, 0] *= self.noise_vx
         noise[:, :, 1] *= self.noise_wz
         # Correlated noise produces executable control sequences rather than frame-wise chatter.
@@ -218,6 +238,75 @@ class FootprintMPPIController:
         controls[1, :, 0] = min(0.90, self.max_vx)
         controls[1, :, 1] = np.clip(2.0 * desired_heading, -self.max_wz, self.max_wz)
         return controls
+
+    def _ut_weights(self):
+        state_dim = 3
+        scale_lambda = self.ut_alpha ** 2 * (
+            state_dim + self.ut_kappa) - state_dim
+        spread = state_dim + scale_lambda
+        mean_weights = np.full(2 * state_dim + 1, 0.5 / spread,
+                               dtype=np.float64)
+        covariance_weights = mean_weights.copy()
+        mean_weights[0] = scale_lambda / spread
+        covariance_weights[0] = (
+            mean_weights[0] + 1.0 - self.ut_alpha ** 2 + self.ut_beta)
+        return spread, mean_weights, covariance_weights
+
+    def _rollout_unscented(self, controls):
+        """Propagate sigma-point cones following Mohamed et al., T-RO 2025."""
+        batch_count = controls.shape[0]
+        spread, mean_weights, covariance_weights = self._ut_weights()
+        mean = np.zeros((batch_count, 3), dtype=np.float64)
+        covariance = np.zeros((batch_count, 3, 3), dtype=np.float64)
+        covariance[:, 0, 0] = self.ut_initial_position_var
+        covariance[:, 1, 1] = self.ut_initial_position_var
+        covariance[:, 2, 2] = self.ut_initial_yaw_var
+        sigma_history = np.zeros(
+            (batch_count, 7, self.horizon, 3), dtype=np.float64)
+        mean_history = np.zeros(
+            (batch_count, self.horizon, 3), dtype=np.float64)
+        covariance_history = np.zeros(
+            (batch_count, self.horizon, 3, 3), dtype=np.float64)
+        eye = np.eye(3, dtype=np.float64)[None, :, :]
+
+        for t in range(self.horizon):
+            roots = np.linalg.cholesky(
+                spread * covariance + 1e-10 * eye)
+            sigma = np.empty((batch_count, 7, 3), dtype=np.float64)
+            sigma[:, 0] = mean
+            for axis in range(3):
+                delta = roots[:, :, axis]
+                sigma[:, axis + 1] = mean + delta
+                sigma[:, axis + 4] = mean - delta
+
+            v = controls[:, t, 0, None]
+            w = controls[:, t, 1, None]
+            yaw = sigma[:, :, 2]
+            sigma[:, :, 0] += v * np.cos(yaw) * self.rollout_dt
+            sigma[:, :, 1] += v * np.sin(yaw) * self.rollout_dt
+            sigma[:, :, 2] = _wrap_angle(
+                yaw + w * self.rollout_dt)
+
+            mean[:, 0] = np.sum(mean_weights[None, :] * sigma[:, :, 0], axis=1)
+            mean[:, 1] = np.sum(mean_weights[None, :] * sigma[:, :, 1], axis=1)
+            sin_yaw = np.sum(
+                mean_weights[None, :] * np.sin(sigma[:, :, 2]), axis=1)
+            cos_yaw = np.sum(
+                mean_weights[None, :] * np.cos(sigma[:, :, 2]), axis=1)
+            mean[:, 2] = np.arctan2(sin_yaw, cos_yaw)
+
+            differences = sigma - mean[:, None, :]
+            differences[:, :, 2] = _wrap_angle(differences[:, :, 2])
+            covariance = np.einsum(
+                "i,bia,bic->bac", covariance_weights, differences, differences)
+            covariance = 0.5 * (
+                covariance + np.swapaxes(covariance, 1, 2))
+            covariance += 1e-10 * eye
+
+            sigma_history[:, :, t] = sigma
+            mean_history[:, t] = mean
+            covariance_history[:, t] = covariance
+        return sigma_history, mean_history, covariance_history, mean_weights
 
     def _rollout(self, controls):
         states = np.zeros((controls.shape[0], self.horizon, 3), dtype=np.float64)
@@ -282,6 +371,98 @@ class FootprintMPPIController:
         return (track_cost + terminal_cost + heading_cost + collision_cost
                 + proximity_cost + smooth_cost + effort_cost), collision
 
+    def _risk_sensitive_tracking_cost(self, means, covariances, targets,
+                                      track_weight, terminal_weight):
+        """Equation (14) risk-sensitive quadratic tracking cost."""
+        gamma = self.ut_risk_gamma
+        errors = means[:, :, :2] - targets[None, :, :]
+        covariances_xy = covariances[:, :, :2, :2]
+
+        def evaluate(error, covariance, weight):
+            if abs(gamma) < 1e-9:
+                return weight * np.sum(error * error, axis=-1)
+            identity = np.eye(2, dtype=np.float64)
+            inv_q = identity / float(weight)
+            q_risk = np.linalg.inv(inv_q + gamma * covariance)
+            quadratic = np.einsum("...i,...ij,...j->...", error, q_risk, error)
+            sign, logdet = np.linalg.slogdet(
+                identity + gamma * float(weight) * covariance)
+            invalid = sign <= 0.0
+            value = logdet / gamma + quadratic
+            value[invalid] = 1e6
+            return value
+
+        running = evaluate(errors, covariances_xy, track_weight)
+        terminal = evaluate(
+            errors[:, -1], covariances_xy[:, -1], terminal_weight)
+        return np.sum(running, axis=1) + terminal
+
+    def _unscented_cost(self, sigma_states, mean_states, covariances,
+                        controls, targets, occ_bev, mean_weights):
+        batch_count, sigma_count = sigma_states.shape[:2]
+        flat_states = sigma_states.reshape(
+            batch_count * sigma_count, self.horizon, 3)
+        repeated_controls = np.repeat(controls, sigma_count, axis=0)
+        sigma_costs, sigma_collision = self._trajectory_cost(
+            flat_states, repeated_controls, targets, occ_bev)
+        sigma_costs = sigma_costs.reshape(batch_count, sigma_count)
+        sigma_collision = sigma_collision.reshape(
+            batch_count, sigma_count, self.horizon)
+
+        errors = sigma_states[:, :, :, :2] - targets[None, None, :, :]
+        old_tracking = 5.0 * np.sum(errors * errors, axis=(2, 3))
+        terminal_errors = sigma_states[:, :, -1, :2] - targets[None, None, -1, :]
+        old_tracking += 15.0 * np.sum(
+            terminal_errors * terminal_errors, axis=2)
+        non_tracking = np.sum(
+            mean_weights[None, :] * (sigma_costs - old_tracking), axis=1)
+        risk_tracking = self._risk_sensitive_tracking_cost(
+            mean_states, covariances, targets, 5.0, 15.0)
+        return (non_tracking + risk_tracking,
+                sigma_collision, sigma_costs)
+
+    def _smooth_control_sequence(self, controls):
+        window = min(self.ut_smoothing_window,
+                     self.horizon if self.horizon % 2 else self.horizon - 1)
+        if window < 5:
+            return controls
+        polyorder = min(3, window - 2)
+        smoothed = savgol_filter(
+            controls, window_length=window, polyorder=polyorder,
+            axis=0, mode="interp")
+        smoothed[:, 0] = np.clip(smoothed[:, 0], self.min_vx, self.max_vx)
+        smoothed[:, 1] = np.clip(smoothed[:, 1], -self.max_wz, self.max_wz)
+        return smoothed
+
+    def _command_unscented(self, occ, targets, desired_heading):
+        sigma_count = 7
+        batch_count = max(2, self.num_samples // sigma_count)
+        controls = self._sample_controls(desired_heading, count=batch_count)
+        sigma_states, mean_states, covariances, mean_weights = (
+            self._rollout_unscented(controls))
+        costs, sigma_collision, _ = self._unscented_cost(
+            sigma_states, mean_states, covariances,
+            controls, targets, occ, mean_weights)
+        finite = np.isfinite(costs)
+        if not np.any(finite):
+            return None
+        best = float(np.min(costs[finite]))
+        logits = np.clip(
+            -(costs - best) / max(self.temperature, 1e-6), -60.0, 0.0)
+        weights = np.exp(logits)
+        weights[~finite] = 0.0
+        weights /= max(float(np.sum(weights)), 1e-12)
+        self._u = np.sum(weights[:, None, None] * controls, axis=0)
+        self._u = self._smooth_control_sequence(self._u)
+
+        best_idx = int(np.argmin(costs))
+        self.last_best_cost = float(costs[best_idx])
+        self.last_collision_fraction = float(np.sum(
+            mean_weights[:, None] * sigma_collision[best_idx]) / self.horizon)
+        self.last_plan = mean_states[best_idx].copy()
+        self.last_state_covariance = covariances[best_idx].copy()
+        return self._u[0].copy()
+
     def command(self, occ_bev, path_xy, goal_xy=None):
         occ = np.asarray(occ_bev, dtype=np.uint8)
         if occ.shape != (self.H, self.W):
@@ -291,26 +472,33 @@ class FootprintMPPIController:
             targets[:] = np.asarray(goal_xy, dtype=np.float64)[:2]
         desired_heading = math.atan2(targets[min(3, self.horizon - 1), 1],
                                      max(0.05, targets[min(3, self.horizon - 1), 0]))
-        controls = self._sample_controls(desired_heading)
-        states = self._rollout(controls)
-        costs, collision = self._trajectory_cost(states, controls, targets, occ)
-        finite = np.isfinite(costs)
-        if not np.any(finite):
-            return 0.0, 0.0
-        best = float(np.min(costs[finite]))
-        logits = -(costs - best) / max(self.temperature, 1e-6)
-        logits = np.clip(logits, -60.0, 0.0)
-        weights = np.exp(logits)
-        weights[~finite] = 0.0
-        weights /= max(float(np.sum(weights)), 1e-12)
-        self._u = np.sum(weights[:, None, None] * controls, axis=0)
+        if self.variant == "unscented":
+            cmd = self._command_unscented(occ, targets, desired_heading)
+            if cmd is None:
+                return 0.0, 0.0
+        else:
+            controls = self._sample_controls(desired_heading)
+            states = self._rollout(controls)
+            costs, collision = self._trajectory_cost(
+                states, controls, targets, occ)
+            finite = np.isfinite(costs)
+            if not np.any(finite):
+                return 0.0, 0.0
+            best = float(np.min(costs[finite]))
+            logits = -(costs - best) / max(self.temperature, 1e-6)
+            logits = np.clip(logits, -60.0, 0.0)
+            weights = np.exp(logits)
+            weights[~finite] = 0.0
+            weights /= max(float(np.sum(weights)), 1e-12)
+            self._u = np.sum(weights[:, None, None] * controls, axis=0)
 
-        best_idx = int(np.argmin(costs))
-        self.last_best_cost = float(costs[best_idx])
-        self.last_collision_fraction = float(np.mean(collision[best_idx]))
-        self.last_plan = states[best_idx].copy()
-
-        cmd = self._u[0].copy()
+            best_idx = int(np.argmin(costs))
+            self.last_best_cost = float(costs[best_idx])
+            self.last_collision_fraction = float(np.mean(collision[best_idx]))
+            self.last_plan = states[best_idx].copy()
+            self.last_state_covariance = np.zeros(
+                (self.horizon, 3, 3), dtype=np.float64)
+            cmd = self._u[0].copy()
         cmd[1] = 0.65 * self._last_cmd[1] + 0.35 * cmd[1]
         if abs(cmd[1]) < 0.035:
             cmd[1] = 0.0
