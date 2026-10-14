@@ -1,0 +1,20 @@
+{
+  "scene": "random_corridor_easy",
+  "methods": [
+    "umppi"
+  ],
+  "seed_start": 20261000,
+  "num_seeds": 1,
+  "vio": "ideal",
+  "python": "/home/fabu/miniconda3/envs/himloco/bin/python",
+  "git_commit": "809b829e9afcb21638dde0c370219f364435be27",
+  "git_dirty": true,
+  "method_provenance": {
+    "umppi": {
+      "paper": "U-MPPI, IEEE Transactions on Robotics 2025",
+      "doi": "10.1109/TRO.2025.3526078",
+      "implementation": "HIMLoco NumPy adaptation with FMM corridor and Go2 footprint",
+      "official_author_code": false
+    }
+  }
+}

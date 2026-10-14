@@ -370,6 +370,47 @@ class BEVMapper:
             return np.maximum(occ_now, self.occ_memory)
         return occ_now
 
+    def get_traversability_cost(self, occ_bev=None, unknown_cost=0.0,
+                                height_scale=None, step_scale=None,
+                                obstacle_cost=1.0):
+        """Return a continuous local traversability risk map in ``[0, 1]``.
+
+        This is the lightweight fourth-chapter label/upper-bound signal:
+        continuous cost is computed from local height variation and sudden
+        forward height changes, while hard obstacles are assigned the maximum
+        risk. A learned RGB-D module can later regress this same BEV target.
+        """
+        valid = self.count >= self.min_points
+        height_range = np.where(valid, self.max_z - self.min_z, 0.0)
+        h_scale = (self.height_range_thresh if height_scale is None
+                   else float(height_scale))
+        h_scale = max(h_scale, 1e-6)
+        rough_cost = np.clip(height_range / h_scale, 0.0, 1.0)
+
+        s_scale = (self.height_range_thresh if step_scale is None
+                   else float(step_scale))
+        s_scale = max(s_scale, 1e-6)
+        step_cost = np.zeros((self.H, self.W), dtype=np.float32)
+        span = max(1, int(self.step_span))
+        if span < self.H:
+            min_z_safe = np.where(valid, self.min_z, np.nan)
+            max_z_safe = np.where(valid, self.max_z, np.nan)
+            step_up = max_z_safe[span:, :] - min_z_safe[:-span, :]
+            ok = np.isfinite(step_up)
+            step_region = step_cost[span:, :]
+            step_region[ok] = np.clip(step_up[ok] / s_scale, 0.0, 1.0)
+            step_cost[span:, :] = step_region
+
+        cost = np.maximum(rough_cost, step_cost).astype(np.float32)
+        if unknown_cost > 0.0:
+            cost[~valid] = float(np.clip(unknown_cost, 0.0, 1.0))
+        if occ_bev is not None and obstacle_cost > 0.0:
+            occ = np.asarray(occ_bev, dtype=bool)
+            if occ.shape != cost.shape:
+                raise ValueError("occ_bev shape does not match traversability map")
+            cost[occ] = float(np.clip(obstacle_cost, 0.0, 1.0))
+        return np.clip(cost, 0.0, 1.0).astype(np.float32)
+
     def shift_with_motion(self, dx_w, dy_w, yaw):
         """
         dx_w, dy_w : world frame 位移
@@ -457,6 +498,7 @@ class FMMGradientController:
         soft_clearance_m=0.65,
         soft_cost_weight=4.0,
         soft_cost_power=2.0,
+        traversability_cost_weight=0.0,
         # --- 转向决策锁存（修复对称鞍点处 wz 逐步振荡导致的原地打转）---
         hysteresis_thresh=0.0,    # 梯度横向分量小于该值时沿用上次转向符号；0=关闭
         hysteresis_hold_steps=0,  # 转向符号最少保持多少步；0=关闭
@@ -480,6 +522,7 @@ class FMMGradientController:
         self.soft_clearance_m = float(soft_clearance_m)
         self.soft_cost_weight = float(soft_cost_weight)
         self.soft_cost_power = float(soft_cost_power)
+        self.traversability_cost_weight = float(traversability_cost_weight)
 
         if self.hard_radius_m < 0.0:
             raise ValueError("hard_radius_m must be >= 0")
@@ -489,6 +532,8 @@ class FMMGradientController:
             raise ValueError("soft_cost_weight must be >= 0")
         if self.soft_cost_power <= 0.0:
             raise ValueError("soft_cost_power must be > 0")
+        if self.traversability_cost_weight < 0.0:
+            raise ValueError("traversability_cost_weight must be >= 0")
 
         self.H = int(self.bev_x / self.bev_res)
         self.W = int(self.bev_y / self.bev_res)
@@ -499,6 +544,7 @@ class FMMGradientController:
         self.fmm_dist = None
         self.hard_obstacle_map = None
         self.soft_cost_map = None
+        self.traversability_cost_map = None
         self.travel_speed_map = None
         self.obstacle_clearance_map = None
         self._path_cache = None
@@ -581,7 +627,7 @@ class FMMGradientController:
 
         return hard_occ, soft_cost
 
-    def update(self, occ_bev):
+    def update(self, occ_bev, traversability_cost=None):
         self._path_cache = None
         if self.goal_rc is None:
             self.fmm_dist = None
@@ -604,6 +650,17 @@ class FMMGradientController:
 
         self.hard_obstacle_map = occ.copy()
         self.soft_cost_map = soft_cost
+        if traversability_cost is None:
+            trav_cost = np.zeros_like(soft_cost, dtype=np.float32)
+        else:
+            trav_cost = np.asarray(traversability_cost, dtype=np.float32)
+            if trav_cost.shape != soft_cost.shape:
+                raise ValueError(
+                    "traversability_cost shape %s does not match planner shape %s"
+                    % (trav_cost.shape, soft_cost.shape))
+            trav_cost = np.clip(trav_cost, 0.0, 1.0)
+            trav_cost[occ > 0] = 1.0
+        self.traversability_cost_map = trav_cost
 
         #  2) traversable: 1 free / 0 obstacle
         traversable = (1 - occ).astype(np.float32)
@@ -616,9 +673,11 @@ class FMMGradientController:
         # goal 如果落在障碍里：直接把它钳成 free（否则 skfmm 会返回 mask 常量）
         trav_ma[gr, gc] = 0.0
 
-        if self.use_soft_cost:
+        if self.use_soft_cost or self.traversability_cost_weight > 0.0:
             # 代价越高，传播速度越慢；travel_time 因而偏好更大的障碍净空。
-            speed = 1.0 / (1.0 + self.soft_cost_weight * soft_cost)
+            speed = 1.0 / (
+                1.0 + self.soft_cost_weight * soft_cost
+                + getattr(self, "traversability_cost_weight", 0.0) * trav_cost)
             speed = np.maximum(speed, 1e-3).astype(np.float32)
             speed_ma = ma.array(speed, mask=ma.getmaskarray(trav_ma))
             speed_ma[gr, gc] = 1.0

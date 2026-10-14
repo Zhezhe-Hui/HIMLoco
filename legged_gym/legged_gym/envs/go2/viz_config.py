@@ -142,6 +142,11 @@ def _env_float(name, default):
     return float(raw) if raw else float(default)
 
 
+def _env_str(name, default):
+    raw = os.environ.get(name, "").strip()
+    return raw if raw else str(default)
+
+
 def _env_range(name, default, allow_none=False):
     """Read a comma-separated numeric range such as ``7,29``."""
     raw = os.environ.get(name, "").strip()
@@ -685,10 +690,11 @@ POLICY_EXPERIMENT_NAME = "rough_go2"   #: logs/ 下的实验名（对应 runner.
 #: 留空 = 默认 logs/<experiment_name>；也可填绝对路径的 log_root
 POLICY_LOG_ROOT = os.path.join(LOGS_ROOT, POLICY_EXPERIMENT_NAME)
 #: 该实验下当前唯一训练到 1200 迭代的 run（其余都是 2~60 迭代的冒烟测试）
-POLICY_LOAD_RUN = os.path.join(
-    LOGS_ROOT, "go2_new_reward", "Dec10_20-00-07_")
+POLICY_LOAD_RUN = os.environ.get(
+    "HIMLOCO_POLICY_LOAD_RUN",
+    os.path.join(LOGS_ROOT, "Dec10_20-00-07_"))
 #: -1 = 取该 run 里编号最大的 model_*.pt；填数字则取 model_<N>.pt
-POLICY_CHECKPOINT = 1200
+POLICY_CHECKPOINT = _env_int("HIMLOCO_POLICY_CHECKPOINT", 1200)
 
 
 # =====================================================================
@@ -1815,6 +1821,40 @@ FMM_SOFT_CLEARANCE_M = 0.65
 FMM_SOFT_COST_WEIGHT = 4.0
 #: 软代价曲线指数。2.0 让远端影响平缓、靠近硬边界时快速增强。
 FMM_SOFT_COST_POWER = 2.0
+
+# ---------- 第四章：连续可通行性风险代价（默认关闭） ----------
+#: 启用后，BEVMapper 会从局部高度起伏/台阶变化生成 [0,1] 连续可通行代价，
+#: 并把它同时加入 FMM 传播速度和 MPPI 候选轨迹代价。该解析代价是第四章
+#: RGB-D 可通行性学习的标签/上限信号；训练模型前先用于闭环 ablation。
+TRAVERSABILITY_COST_ENABLE = _env_bool("HIMLOCO_TRAVERSABILITY_COST", False)
+#: 可通行性代价来源：
+#:   analytic  = BEV 高度起伏/台阶解析代价；
+#:   pred_cost = 读取学习模型导出的 pred_cost 灰度风险图并接入同一规划接口。
+TRAVERSABILITY_COST_SOURCE = _env_str(
+    "HIMLOCO_TRAV_SOURCE", "analytic").strip().lower()
+#: 未观测区域风险；当前保持 0，避免单前视相机把视野外区域全部变成保守障碍。
+TRAVERSABILITY_UNKNOWN_COST = _env_float("HIMLOCO_TRAVERSABILITY_UNKNOWN_COST", 0.0)
+#: 硬障碍格的风险代价。通常设为 1，由 FMM 硬层和 MPPI 碰撞项共同约束。
+TRAVERSABILITY_OBSTACLE_COST = _env_float("HIMLOCO_TRAVERSABILITY_OBSTACLE_COST", 1.0)
+#: 学习式风险图目录。可以直接指向 pred_cost，也可以指向包含 pred_cost 子目录的导出目录。
+TRAVERSABILITY_PRED_COST_DIR = _env_str(
+    "HIMLOCO_TRAV_PRED_COST_DIR",
+    os.path.join(
+        RUNS_ROOT,
+        "traversability",
+        "rugd_tinyunet_main_768e4_export_128_20261008",
+        "pred_cost",
+    ),
+)
+#: 学习式风险图更新周期，默认跟随感知降频量级。
+TRAVERSABILITY_PRED_COST_INTERVAL = _env_int("HIMLOCO_TRAV_PRED_COST_INTERVAL", 4)
+#: 图像到 BEV 的临时适配方向。后续替换为严格投影时可关闭。
+TRAVERSABILITY_PRED_COST_FLIP_VERTICAL = _env_bool("HIMLOCO_TRAV_PRED_COST_FLIP_VERTICAL", True)
+TRAVERSABILITY_PRED_COST_FLIP_HORIZONTAL = _env_bool("HIMLOCO_TRAV_PRED_COST_FLIP_HORIZONTAL", True)
+#: FMM travel-time 中可通行性代价权重；越大越倾向绕开粗糙/台阶风险区。
+FMM_TRAVERSABILITY_COST_WEIGHT = _env_float("HIMLOCO_FMM_TRAV_WEIGHT", 0.5)
+#: MPPI 轨迹代价中的可通行性风险权重。
+MPPI_TRAVERSABILITY_COST_WEIGHT = _env_float("HIMLOCO_MPPI_TRAV_WEIGHT", 1.5)
 
 # ---------- 转向决策锁存（⚠ 修复 wz 逐步振荡导致的原地打转） ----------
 #: 问题（2026-09-16 实测定位）：当 goal 与机器人连线【正对】一个障碍时，

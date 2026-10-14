@@ -1,0 +1,26 @@
+/home/fabu/miniconda3/envs/himloco/lib/python3.8/site-packages/torch/cuda/__init__.py:497: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+Using /home/fabu/.cache/torch_extensions/py38_cu117 as PyTorch extensions root...
+Importing module 'gym_38' (/home/fabu/HIMLoco/libraries/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/fabu/HIMLoco/libraries/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 1.13.1+cu117
+Device count 0
+/home/fabu/HIMLoco/libraries/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Traceback (most recent call last):
+  File "legged_gym/scripts/play1.py", line 35, in <module>
+    from legged_gym.envs import *
+  File "/home/fabu/HIMLoco/legged_gym/legged_gym/envs/__init__.py", line 33, in <module>
+    from .base.legged_robot import LeggedRobot
+  File "/home/fabu/HIMLoco/legged_gym/legged_gym/envs/base/legged_robot.py", line 38, in <module>
+    from isaacgym import gymtorch, gymapi, gymutil
+  File "/home/fabu/HIMLoco/libraries/isaacgym/python/isaacgym/gymtorch.py", line 109, in <module>
+    _import_gymtorch()
+  File "/home/fabu/HIMLoco/libraries/isaacgym/python/isaacgym/gymtorch.py", line 45, in _import_gymtorch
+    gt = torch.utils.cpp_extension.load(name="gymtorch", sources=sources, extra_cflags=cflags, verbose=True)
+  File "/home/fabu/miniconda3/envs/himloco/lib/python3.8/site-packages/torch/utils/cpp_extension.py", line 1284, in load
+    return _jit_compile(
+  File "/home/fabu/miniconda3/envs/himloco/lib/python3.8/site-packages/torch/utils/cpp_extension.py", line 1485, in _jit_compile
+    if baton.try_acquire():
+  File "/home/fabu/miniconda3/envs/himloco/lib/python3.8/site-packages/torch/utils/file_baton.py", line 29, in try_acquire
+    self.fd = os.open(self.lock_file_path, os.O_CREAT | os.O_EXCL)
+OSError: [Errno 30] Read-only file system: '/home/fabu/.cache/torch_extensions/py38_cu117/gymtorch/lock'

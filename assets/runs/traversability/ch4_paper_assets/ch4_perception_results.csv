@@ -1,0 +1,6 @@
+experiment,pixel_acc,miou,iou_low,iou_medium,iou_high,notes
+RUGD main,0.878,0.775,0.767,0.702,0.855,open outdoor RGB pretest
+BASEPROD 4epoch default,0.825,0.473,0.774,0.615,0.030,D435i no class weighting
+BASEPROD 4epoch weighted,0.823,0.542,0.792,0.557,0.277,D435i class weights 1.0/1.3/8.0
+BASEPROD 30epoch formal,0.913,0.722,0.888,0.775,0.502,D435i formal validation best epoch 28
+BASEPROD 30epoch export128,0.947,0.726,0.941,0.709,0.528,D435i formal export subset

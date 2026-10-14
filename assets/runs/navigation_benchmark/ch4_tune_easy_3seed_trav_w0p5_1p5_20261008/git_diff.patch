@@ -1,0 +1,988 @@
+diff --git "a/docs/\347\241\225\345\243\253\347\240\224\347\251\266\347\224\237\345\255\246\344\275\215\344\270\255\346\234\237\346\212\245\345\221\212.md" "b/docs/\347\241\225\345\243\253\347\240\224\347\251\266\347\224\237\345\255\246\344\275\215\344\270\255\346\234\237\346\212\245\345\221\212.md"
+deleted file mode 100644
+index 5545fd6..0000000
+--- "a/docs/\347\241\225\345\243\253\347\240\224\347\251\266\347\224\237\345\255\246\344\275\215\344\270\255\346\234\237\346\212\245\345\221\212.md"
++++ /dev/null
+@@ -1,494 +0,0 @@
+-# 硕士研究生学位中期考核附件
+-
+-## 基本信息
+-
+-| 项目 | 内容 |
+-| --- | --- |
+-| 论文题目 | 面向野外复杂地形的四足机器人分层强化学习运动规划方法 |
+-| 姓名 | 【请填写】 |
+-| 学号 | 【请填写】 |
+-| 学院 | 【请填写】 |
+-| 学科专业 | 【请填写】 |
+-| 研究生类型 | 【请填写：学术学位硕士／专业学位硕士】 |
+-| 导师姓名 | 【请填写】 |
+-| 答辩时间 | 【请填写】 |
+-| 答辩地点 | 【请填写】 |
+-| 填表日期 | 【请填写】 |
+-| 课题来源 | 【请填写：自选／导师科研项目／其他】 |
+-
+-本文档为硕士研究生学位论文中期考核附件材料，主要包括课题研究综述、综述参考文献、实验方案和技术路线、已完成的实验研究、取得的实验数据及分析、现阶段成果、存在的问题以及下一步研究计划。本文所述“已完成”内容均以当前代码、原始日志和统计结果为依据；尚未完成的视觉可通行性学习与实物部署工作均列入后续计划。
+-
+-# 综述
+-
+-## 研究意义
+-
+-在全球科技智能化转型的浪潮下，机器人技术已经成为衡量国家科技创新能力和高端装备水平的重要指标之一，其应用范围也正由结构化工业环境向复杂非结构化环境快速延伸。在地震废墟搜救、野外资源勘探、森林与山地巡查、危险区域侦察等任务中，机器人能够代替人员进入坍塌、崎岖或存在次生灾害风险的区域，承担环境探测、目标搜索和信息回传等工作。这些场景通常缺少可直接使用的先验地图，并伴随地形起伏、障碍随机分布、道路损毁、视野遮挡和通信不稳定等问题，对机器人的自主感知、导航决策和复杂地形运动能力提出了较高要求。传统轮式和履带式机器人虽然在平坦、连续路面上具有结构简单、运动效率高等优势，但受到接触形式和底盘结构限制，在碎石、台阶、沟壑和不连续地面上容易出现打滑、托底或无法继续前进的情况，难以满足野外复杂环境中的连续作业需求。
+-
+-【建议插图：履带式与轮式机器人在灾后救援、野外勘探等场景中的作业情况】
+-
+-四足机器人凭借仿生腿部结构和多自由度关节，能够主动选择落足位置，并根据地面高度和接触状态调整机身姿态。在遭遇离散凸起、碎石和台阶时，机器人可以通过腿部协调运动维持平衡，完成跨越障碍、攀爬楼梯和通过不规则地面等动作[1-4,21]。腿式结构还为任务载荷提供了较大的扩展空间，可在机身或腿部安装相机、气体检测器和生命探测设备，也可与机械臂协同完成取样、搬运等操作。随着驱动器、感知器件和强化学习控制技术的发展，ANYmal、Spot和宇树Go系列等四足机器人已经由实验室样机逐步走向工程应用，四足机器人在复杂环境中的自主作业也因此成为当前机器人领域的重要研究方向。
+-
+-【建议插图：Spot与Go2在碎石、台阶和野外场景中的运动】
+-
+-路径规划是四足机器人自主完成任务的核心环节，是机器人根据机载传感器获得的环境信息，结合目标位置和自身运动能力，在起点与目标之间持续生成可执行路线或速度指令的过程[10-16,20]。规划结果直接影响机器人的作业效率和运行安全。即使机器人具备较强的硬件性能和地形适应能力，如果上层规划没有正确处理障碍物、机身尺寸和运动约束，仍可能因路线选择不当发生碰撞、侧擦、局部停滞或反复转向，最终无法到达目标。因此，如何使路径规划结果既具有环境可达性，又符合四足机器人步态执行特点，是实现自主作业必须解决的问题。
+-
+-现有移动机器人导航系统较多面向园区、仓库和工业巡检等规则环境，通常利用激光雷达预先建图，再依据全局地图完成定位和路径规划。这类方案在环境结构稳定时具有较高可靠性，但在灾后废墟和野外探索中，原有地图可能不存在或已经失效，树木、岩石、草丛、低矮碎石和可跨越台阶也难以用统一的二值障碍阈值准确描述。机器人需要在运动过程中依靠机载相机持续感知局部环境，并根据新观测实时调整路线。视觉传感器体积小、信息丰富，RGB图像能够提供物体类别和地表纹理，深度图能够提供障碍距离和局部几何结构，为低成本、无先验地图导航提供了可行基础[7-9]。
+-
+-但是，单个前视RGB-D相机存在视场边界、近距离盲区和遮挡，仅根据当前深度帧进行反应式避障时，机器人已经离开视野的侧面障碍可能从局部地图中消失。当目标位于侧前方或机器人执行较大角度转向时，即使规划的中心点没有进入障碍区域，机身侧面和腿部运动范围仍可能与障碍发生接触。简单增大障碍膨胀半径可以降低贴边风险，却可能将实际可通行的狭窄区域完全封闭。与此同时，FMM、A*等离散栅格方法在频繁重规划时可能产生左右切换的转向指令，这种不连续性会传递到底层步态，增加调姿次数和能量消耗，严重时还会影响机器人稳定性。
+-
+-针对这些问题，本文以Unitree Go2四足机器人和Intel RealSense D435i相机为硬件平台，研究面向野外复杂地形的分层视觉导航与运动控制方法。系统采用HIMLoco强化学习策略作为底层运动控制器，使机器人能够跟踪上层给出的线速度和角速度指令；上层利用D435i深度图构建局部BEV地图，在FMM可达走廊的基础上引入硬碰撞层、连续软安全代价和Go2机身足迹，并通过MPPI对短时运动轨迹进行优化，从而兼顾障碍净空、窄区域通行能力和控制指令平滑性。后续研究将在几何规划基础上进一步融合RGB语义与深度信息，区分树木、岩石、草地、碎石和可跨越区域，形成与四足机器人运动能力相关的连续可通行代价。
+-
+-与直接由图像生成关节动作的完全端到端方案相比，本文采用的分层结构能够分别分析感知、定位、规划和运动控制环节，便于通过消融实验判断性能变化的来源，也有利于逐步完成从Isaac Gym仿真到Go2实物平台的迁移。相关研究可为灾后搜救、野外勘察和危险区域自主探索提供一种不依赖预先精确建图的技术思路，对提升四足机器人在未知复杂环境中的自主导航能力具有一定理论意义和工程应用价值。
+-
+-## 国内外研究现状
+-
+-### 四足机器人运动控制
+-
+-四足机器人运动控制经历了由模型控制向学习控制快速发展的过程。传统方法通常依据刚体动力学、接触约束和足端轨迹构建控制器，采用虚拟模型控制、全身控制、模型预测控制或二次规划分配地面反力。这类方法物理意义明确，在模型准确、接触状态可估计时能够获得稳定运动，但面对强非线性接触、复杂地形和模型参数误差时，需要较多人工建模与参数调整。
+-
+-深度强化学习为复杂运动技能提供了新的实现路径。Hwangbo等通过大规模仿真训练和动力学随机化，实现了四足机器人策略从仿真到真实平台的迁移[1]。Lee等进一步证明强化学习策略能够依靠本体感知在多种复杂地形上获得鲁棒运动能力[2]。Rudin等提出大规模并行训练方法，在较短时间内完成四足运动策略学习[3]。Miki等将外部感知与本体感知融合，使ANYmal能够在崎岖地形上进行感知运动[4]。这些研究表明，强化学习控制器能够在高维状态和复杂接触条件下直接学习速度跟踪与姿态稳定行为，已经成为四足机器人底层运动控制的重要技术路线。
+-
+-然而，底层运动策略通常接收期望线速度和角速度，而不直接解决目标点导航、障碍绕行和任务决策问题。即使步态策略在崎岖地形上具备较强通过能力，不合理的上层指令仍可能使机器人撞向障碍、在狭窄区域反复转向或进入不可恢复状态。因此，研究中常采用分层架构：上层根据感知信息生成局部路径或速度命令，下层策略负责跟踪命令并维持动态稳定。本课题已有的HIMLoco策略属于这一底层控制层，后续所有导航算法均使用同一策略，以避免底层能力差异干扰上层规划比较。
+-
+-### 复杂地形感知与可通行性评价
+-
+-移动机器人环境感知通常包括占据建图、高程建图、语义分割和可通行性估计。激光雷达具有量测范围远、几何精度高和光照适应性较好的优点，是工业巡检和室外无人系统的常用传感器。但高线束雷达成本较高，且仅凭几何形状难以准确区分高草、灌木、阴影和刚性障碍。RGB相机能够提供丰富的纹理和语义信息，深度相机能够直接给出近距离几何结构，二者结合适合构建轻量级局部感知系统。
+-
+-传统几何方法把点云投影为占据栅格或高程图，根据高度差、坡度、粗糙度和法向变化判定可通行区域。Elevation Mapping及其后续工作为足式机器人提供了在线高程表示[5]，ArtPlanner等方法则利用2.5D高程图生成适合四足机器人执行的路径[6]。几何方法解释清晰、无需训练，但对传感器噪声、遮挡和参数阈值敏感，也难以理解“看似有高度但可以穿过”的植被。
+-
+-近年来，视觉可通行性学习逐渐成为野外导航研究热点。WVN利用自监督视觉特征和机器人在场交互数据快速学习可通行区域，展示了在森林、草地等自然环境中的在线适应能力[7]。TerrainNet联合语义与几何信息，对越野环境进行稠密建模[8]。ViPlanner将视觉语义信息用于局部导航，通过学习方式预测路径，使机器人能够结合地形语义与几何条件作出规划[9]。这些方法说明，可通行性并非简单的“障碍／非障碍”二分类，而应与机器人形态、运动能力和任务风险共同定义。
+-
+-对于D435i这类前视RGB-D相机，视野之外的障碍无法在当前帧中直接观测，深度量测还会受到反光、纹理、距离和入射角影响。利用视觉惯性里程计将连续帧变换到统一坐标系，可在一定时间范围内保留历史观测，但位姿噪声也会造成地图重影和目标误差。因此，感知建图模块需要明确地图时效、位姿来源和误差边界。仅在仿真中使用绝对真值而不讨论实际定位来源，会高估实物系统的可行性。
+-
+-### 局部路径规划与反应式避障
+-
+-经典局部规划方法主要包括人工势场法、动态窗口法、图搜索、快速行进法和采样型模型预测控制。人工势场法通过目标吸引力和障碍排斥力合成运动方向，结构简单、计算量小，但容易陷入局部极小点，并在对称障碍或狭窄通道中产生振荡[10]。SAPF在传统势场基础上引入安全性相关的排斥方向调整，以改善部分局部规划问题[11]。此类方法适合作为低计算开销的反应式基线，但在密集随机障碍中仍缺少对未来机身运动包络的显式评价。
+-
+-动态窗口法在速度空间内采样线速度和角速度，通过短时轨迹前向模拟评价目标方向、障碍距离和速度收益[12]。DWA可以直接输出满足运动学约束的速度指令，因而广泛用于局部导航。近年来的改进工作主要从自适应评价权重、长时域状态搜索、动态障碍预测和采样效率等方面提高性能。PS-DWA使用模式搜索减少速度候选评价数量，重点改善动态窗口搜索效率[13]。但DWA类方法对评价函数权重、预测时域和参考路径质量较敏感；若速度采样分辨率不足，可能错过狭窄可行解，若采样过密则会增加在线计算开销。
+-
+-FMM通过求解Eikonal方程在栅格上构造到目标的到达时间场，可沿势场梯度快速获得无碰路径[14]。它具有实现简单、计算稳定和适合栅格地图的优点，但基础FMM通常将障碍设置为二值不可通行区域，并将机器人近似为质点。工程中常通过固定半径膨胀障碍来补偿机器人尺寸，该处理难以同时兼顾安全净空与窄通道可达性。此外，沿离散势场局部梯度直接生成角速度时，感知更新和栅格变化可能导致控制方向频繁切换。
+-
+-MPPI是一类基于采样的随机最优控制方法，通过在控制序列周围生成扰动轨迹、计算轨迹累计代价并按指数权重更新控制序列，实现在线模型预测控制[15]。它能够把目标距离、路径偏差、障碍距离、机身足迹碰撞和控制平滑等多项代价统一纳入优化，并支持GPU并行采样。对于四足机器人，上层MPPI不必直接预测每个关节，只需以简化机身运动学模型优化速度指令，再由底层强化学习策略执行。因此，它在计算量与轨迹质量之间提供了较适合本课题的平台接口。
+-
+-学习型局部规划进一步尝试从深度图直接预测路径或航点。iPlanner以深度图和局部目标为输入，输出若干三维关键点及碰撞风险，再插值形成局部路径[16]。这类方法能够从训练数据中学习复杂几何模式，减少显式规则设计，但性能与训练分布、相机参数和深度预处理密切相关，输出路径仍需路径跟踪器转换为速度命令。在跨平台比较时，应保持相机视野、目标裁剪、底层控制器和评价标准一致，不能直接比较不同论文中互不相同的场景成功率。
+-
+-### 视觉惯性定位与无先验地图导航
+-
+-机器人要把局部观测与目标方向联系起来，需要持续估计自身位姿。视觉惯性里程计利用相机图像和IMU互补信息估计六自由度运动。VINS-Mono采用紧耦合非线性优化实现单目视觉惯性状态估计[17]，ORB-SLAM3支持视觉、视觉惯性和多地图SLAM[18]。D435i集成双目红外深度与IMU，可为近距离几何感知和VIO提供统一传感器基础，但在快速转动、弱纹理、强振动或长距离运行时仍可能产生漂移。
+-
+-对于无先验地图探索，任务目标不一定是一个事先测得的精确世界坐标。实际系统可以由操作者给定相对方向和距离、GPS航点、视觉目标或待搜索区域，再由前沿探索等方法生成阶段性子目标[19]。局部规划器只需在有限范围内持续朝当前子目标前进并避开即时障碍。当检测到人员、危险区域或通信中继点时，任务层可更新目标或触发停止。由此可见，本课题第三章研究的局部规划并不等同于完整自主探索，而是后续任务层和视觉可通行性模块的执行基础。
+-
+-### 现有问题与本文研究切入点
+-
+-综合现有研究，四足机器人在底层运动控制、视觉感知和局部规划方面均已取得较大进展，但面向低成本单前视RGB-D和未知复杂地形的系统仍存在以下问题。
+-
+-第一，底层运动控制与上层导航评价经常相互耦合。不同方法若使用不同步态控制器，导航成功率差异可能来自运动能力而非规划本身。本文固定HIMLoco作为统一底层，并先评价其速度跟踪能力，再比较上层规划器。
+-
+-第二，固定障碍膨胀把安全边界压缩为单一二值参数。膨胀过小会增加侧擦风险，膨胀过大则会封闭窄通道。本文将障碍表示为硬碰撞层与连续软安全代价层，在不改变绝对碰撞边界的同时对低净空区域施加渐变惩罚。
+-
+-第三，许多局部规划只检测机器人中心点，未显式考虑Go2矩形机身和转弯扫掠范围。本文在MPPI候选轨迹的每个预测位姿上检查机身足迹，使规划器能够拒绝中心点可行但机身侧面会接触障碍的轨迹。
+-
+-第四，单次或少量演示不足以支撑方法有效性结论。本文设置三档随机障碍密度和30个固定配对种子，既进行内部消融，也与iPlanner、PS-DWA和SAPF在同一闭环系统中比较，并使用置信区间和配对显著性检验约束结论范围。
+-
+-第五，仿真真值位姿不能直接代表实物定位。本文将真值明确解释为“理想VIO”，并通过位置噪声、航向噪声、随机游走、延迟和丢帧构造不同压力档位，分析定位误差对终点判定和导航结果的影响，为后续D435i实测标定提供依据。
+-
+-# 综述参考文献
+-
+-[1] Hwangbo J, Lee J, Dosovitskiy A, et al. Learning agile and dynamic motor skills for legged robots[J]. Science Robotics, 2019, 4(26): eaau5872.
+-
+-[2] Lee J, Hwangbo J, Wellhausen L, et al. Learning quadrupedal locomotion over challenging terrain[J]. Science Robotics, 2020, 5(47): eabc5986.
+-
+-[3] Rudin N, Hoeller D, Reist P, et al. Learning to walk in minutes using massively parallel deep reinforcement learning[C]//Proceedings of the 5th Conference on Robot Learning. PMLR, 2022, 164: 91-100.
+-
+-[4] Miki T, Lee J, Hwangbo J, et al. Learning robust perceptive locomotion for quadrupedal robots in the wild[J]. Science Robotics, 2022, 7(62): eabk2822.
+-
+-[5] Fankhauser P, Hutter M. A universal grid map library: Implementation and use case for rough terrain navigation[M]//Koubaa A, ed. Robot Operating System (ROS): The Complete Reference, Volume 1. Cham: Springer, 2016: 99-120. DOI: 10.1007/978-3-319-26054-9_5.
+-
+-[6] Wellhausen L, Hutter M. ArtPlanner: Robust legged robot navigation in the field[J]. Field Robotics, 2023, 3: 413-434. DOI: 10.55417/fr.2023013.
+-
+-[7] Frey J, Mattamala M, Chebrolu N, et al. Fast traversability estimation for wild visual navigation[C]//Robotics: Science and Systems. 2023. DOI: 10.15607/RSS.2023.XIX.054.
+-
+-[8] Meng X, Hatch N, Lambert A, et al. TerrainNet: Visual modeling of complex terrain for high-speed, off-road navigation[C]//Robotics: Science and Systems. 2023. DOI: 10.15607/RSS.2023.XIX.103.
+-
+-[9] Roth P, Nubert J, Yang F, et al. ViPlanner: Visual semantic imperative learning for local navigation[C]//2024 IEEE International Conference on Robotics and Automation. IEEE, 2024: 5243-5249. DOI: 10.1109/ICRA57147.2024.10610025.
+-
+-[10] Khatib O. Real-time obstacle avoidance for manipulators and mobile robots[J]. The International Journal of Robotics Research, 1986, 5(1): 90-98.
+-
+-[11] Szczepanski R. Safe artificial potential field: Novel local path planning algorithm maintaining safe distance from obstacles[J]. IEEE Robotics and Automation Letters, 2023, 8(8): 4823-4830. DOI: 10.1109/LRA.2023.3290819.
+-
+-[12] Fox D, Burgard W, Thrun S. The dynamic window approach to collision avoidance[J]. IEEE Robotics and Automation Magazine, 1997, 4(1): 23-33. DOI: 10.1109/100.580977.
+-
+-[13] Szczepanski R. Computationally efficient dynamic window approach based on pattern search optimization[J]. Acta Mechanica et Automatica, 2025, 19(4): 659-664. DOI: 10.2478/ama-2025-0074.
+-
+-[14] Sethian J A. A fast marching level set method for monotonically advancing fronts[J]. Proceedings of the National Academy of Sciences, 1996, 93(4): 1591-1595. DOI: 10.1073/pnas.93.4.1591.
+-
+-[15] Williams G, Aldrich A, Theodorou E A. Model predictive path integral control: From theory to parallel computation[J]. Journal of Guidance, Control, and Dynamics, 2017, 40(2): 344-357. DOI: 10.2514/1.G001921.
+-
+-[16] Yang F, Wang C, Cadena C, et al. iPlanner: Imperative path planning[C]//Robotics: Science and Systems. 2023. DOI: 10.15607/RSS.2023.XIX.064.
+-
+-[17] Qin T, Li P, Shen S. VINS-Mono: A robust and versatile monocular visual-inertial state estimator[J]. IEEE Transactions on Robotics, 2018, 34(4): 1004-1020. DOI: 10.1109/TRO.2018.2853729.
+-
+-[18] Campos C, Elvira R, Rodríguez J J G, et al. ORB-SLAM3: An accurate open-source library for visual, visual-inertial, and multimap SLAM[J]. IEEE Transactions on Robotics, 2021, 37(6): 1874-1890. DOI: 10.1109/TRO.2021.3075644.
+-
+-[19] Yamauchi B. A frontier-based approach for autonomous exploration[C]//Proceedings 1997 IEEE International Symposium on Computational Intelligence in Robotics and Automation. IEEE, 1997: 146-151.
+-
+-[20] Kim Y, Kim C, Hwangbo J. Learning forward dynamics model and informed trajectory sampler for safe quadruped navigation[C]//Robotics: Science and Systems. 2022. DOI: 10.15607/RSS.2022.XVIII.069.
+-
+-[21] Hoeller D, Rudin N, Sako D, et al. ANYmal parkour: Learning agile navigation for quadrupedal robots[J]. Science Robotics, 2024, 9(88): eadi7566. DOI: 10.1126/scirobotics.adi7566.
+-
+-[22] Margolis G B, Agrawal P. Walk these ways: Tuning robot control for generalization with multiplicity of behavior[C]//Proceedings of the 6th Conference on Robot Learning. PMLR, 2023, 205: 22-31.
+-
+-[23] Kumar A, Fu Z, Pathak D, et al. RMA: Rapid motor adaptation for legged robots[C]//Robotics: Science and Systems. 2021.
+-
+-[24] Fu Z, Kumar A, Agarwal A, et al. Coupling vision and proprioception for navigation of legged robots[C]//Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. 2022.
+-
+-[25] Marder-Eppstein E, Berger E, Foote T, et al. The office marathon: Robust navigation in an indoor office environment[C]//2010 IEEE International Conference on Robotics and Automation. IEEE, 2010: 300-307. DOI: 10.1109/ROBOT.2010.5509725.
+-
+-[26] Rösmann C, Feiten W, Wösch T, et al. Trajectory modification considering dynamic constraints of autonomous robots[C]//Proceedings of the 7th German Conference on Robotics. Munich, 2012: 74-79.
+-
+-[27] Oleynikova H, Taylor Z, Fehr M, et al. Voxblox: Incremental 3D Euclidean signed distance fields for on-board MAV planning[C]//2017 IEEE/RSJ International Conference on Intelligent Robots and Systems. IEEE, 2017: 1366-1373.
+-
+-[28] Usenko V, Engel J, Stückler J, et al. Direct visual-inertial odometry with stereo cameras[C]//2016 IEEE International Conference on Robotics and Automation. IEEE, 2016: 1885-1892. DOI: 10.1109/ICRA.2016.7487335.
+-
+-[29] Shan T, Englot B, Ratti C, et al. LVI-SAM: Tightly-coupled lidar-visual-inertial odometry via smoothing and mapping[C]//2021 IEEE International Conference on Robotics and Automation. IEEE, 2021: 5692-5698. DOI: 10.1109/ICRA48506.2021.9561996.
+-
+-[30] Sünderhauf N, Brock O, Scheirer W, et al. The limits and potentials of deep learning for robotics[J]. The International Journal of Robotics Research, 2018, 37(4-5): 405-420.
+-
+-[31] Thrun S, Burgard W, Fox D. Probabilistic Robotics[M]. Cambridge: MIT Press, 2005.
+-
+-[32] LaValle S M. Planning Algorithms[M]. Cambridge: Cambridge University Press, 2006.
+-
+-[33] Karaman S, Frazzoli E. Sampling-based algorithms for optimal motion planning[J]. The International Journal of Robotics Research, 2011, 30(7): 846-894.
+-
+-[34] Borenstein J, Koren Y. The vector field histogram: Fast obstacle avoidance for mobile robots[J]. IEEE Transactions on Robotics and Automation, 1991, 7(3): 278-288.
+-
+-[35] Hart P E, Nilsson N J, Raphael B. A formal basis for the heuristic determination of minimum cost paths[J]. IEEE Transactions on Systems Science and Cybernetics, 1968, 4(2): 100-107.
+-
+-[36] Dijkstra E W. A note on two problems in connexion with graphs[J]. Numerische Mathematik, 1959, 1: 269-271.
+-
+-[37] Intel Corporation. Intel RealSense Depth Camera D435i Product Documentation[EB/OL].
+-
+-[38] Unitree Robotics. Unitree Go2 Developer Documentation[EB/OL].
+-
+-> 注：以上参考文献按中期报告内容整理。复制到学校模板前，应使用学校要求的GB/T 7714格式，并通过学校数据库核对作者顺序、卷期页码和网络文献访问日期。
+-
+-# 制定的实验方案和技术路线
+-
+-## 实验方案
+-
+-本课题采用“仿真分层验证—视觉能力扩展—实物系统集成”的总体实验方案。实验平台为Unitree Go2模型、Intel RealSense D435i相机模型和Isaac Gym仿真环境，底层使用HIMLoco强化学习运动策略。研究过程不直接训练图像到关节动作的端到端网络，而是将系统划分为任务目标、位姿估计、RGB-D感知、局部代价建模、运动规划和底层控制六个环节，以便分别评价并逐步集成。
+-
+-1. **底层运动控制验证。** 使用已有HIMLoco策略接收期望机身速度，输出12个关节动作或关节目标。通过与RAM等基线比较速度跟踪误差、姿态稳定性和复杂地形适应能力，确定后续全部导航实验共用的底层策略。该部分沿用前期小论文中已有的HIMLoco与RAM跟踪精度结果，不在导航对比中重复改变底层控制器。
+-
+-2. **局部几何感知。** 将D435i深度图依据相机内参反投影为三维点云，经相机坐标系、机身坐标系和局部世界坐标系变换后投影到鸟瞰栅格。根据地面高度、点云高度差和有效深度范围生成局部高度图及二值障碍图，并输出供规划器使用的BEV表示。
+-
+-3. **规划方法内部消融。** 依次比较固定膨胀FMM、双层代价FMM和双层代价FMM引导的足迹MPPI。三种方法使用相同深度输入、位姿、场景、目标、底层HIMLoco策略和到达判据，只改变局部规划结构，以分析连续软安全代价与机身足迹轨迹优化的作用。
+-
+-4. **随机障碍分级实验。** 在相同的离散高度地形和24 m直线导航任务上设置三档难度。简单档包含10个大石头、2棵树和100个静态小碎石；中等档包含15个大石头、3棵树和200个静态小碎石；困难档包含20个大石头、4棵树和400个静态小碎石。三档均使用固定种子20261000至20261029，每个“方法+种子”对应一次独立的起点到终点试验。
+-
+-5. **位姿噪声鲁棒性实验。** 将仿真真值定义为理想VIO，在规划输入端注入位置噪声、航向噪声、随机游走、延迟和丢帧，构造ideal、mild、medium和severe四档。真值只用于结果评价，不反馈给地图和规划器，从而分析定位误差对局部建图、目标变换及到达判断的影响。
+-
+-6. **外部方法对比。** 选择2023年以后的iPlanner、SAPF及PS-DWA作为对比方法。所有方法统一接入当前Isaac Gym场景与HIMLoco底层，只替换上层规划器。iPlanner使用其公开预训练网络，并增加深度预处理和统一路径跟踪接口；SAPF与PS-DWA依据论文方法在当前BEV和速度接口中实现。三档各30个配对种子，共完成360轮正式对比。
+-
+-7. **视觉可通行性学习。** 后续将在RGB-D输入上融合语义和几何特征，区分树木、巨石、草地、台阶、碎石及可跨越区域，输出连续可通行代价。通过像素或栅格层评价与闭环导航评价共同验证该模块，并与纯深度FMM、纯几何足迹MPPI及ViPlanner/WVN类方法比较。
+-
+-8. **实物系统验证。** 在Go2上安装D435i，完成相机外参、时间同步、深度尺度、VIO、ROS2数据流和速度接口标定。按照静态感知、低速直行、单障碍、随机障碍、混合地形的顺序逐步验证，并保留遥控急停和速度限制。仿真噪声参数将根据实测VIO误差重新标定。
+-
+-**图1 实验方案图（建议插入）**
+-
+-建议绘制为：底层HIMLoco验证、第三章几何规划、第四章视觉可通行性、第五章实物集成四个阶段及其输入输出关系。
+-
+-可参考现有素材：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/05_hierarchical_navigation_flowchart.png`。
+-
+-## 技术路线
+-
+-本课题的技术路线由数据流和研究阶段两部分组成。系统运行时，D435i输出RGB图像、深度图和IMU数据；VIO或本体里程计提供机器人相对位姿；深度点云经坐标变换生成局部BEV高度图和障碍图；障碍距离变换生成硬碰撞层和连续软代价层；FMM在局部栅格中给出由当前位置通向局部目标的参考走廊；MPPI围绕参考走廊采样短时速度序列，对机身足迹碰撞、软代价、目标推进、路径偏差和控制变化进行联合评价，输出期望线速度与角速度；HIMLoco再根据本体状态和期望速度生成关节动作，驱动Go2运动。
+-
+-第三章首先完成底层运动控制与几何局部规划。底层部分说明HIMLoco的观测量、策略网络、速度指令和关节动作接口，并使用已有跟踪精度实验说明其作为统一执行器的合理性。上层部分从深度BEV出发，构建双层代价FMM和足迹MPPI，完成三档随机障碍消融、外部方法对比及VIO噪声实验。
+-
+-第四章将在第三章稳定执行链路上增加视觉可通行性学习。RGB分支提取语义和纹理特征，深度分支提取高度、坡度、粗糙度和障碍净空，二者融合后输出连续代价图。该代价图不直接控制关节，而是作为MPPI的地形代价输入，使规划器在多条几何可行路径之间选择更适合四足机器人通过的区域。
+-
+-第五章将完成仿真与实物系统集成。任务层可由操作者提供方向、相对距离、区域或GPS航点，也可由前沿探索产生局部子目标；定位层由D435i视觉惯性里程计和机器人本体状态提供相对位姿；检测到人员或指定目标后触发任务事件。第三章规划器负责局部安全运动，第四章模型负责地形风险区分，HIMLoco负责底层执行。
+-
+-**图2 技术路线图（建议插入）**
+-
+-建议使用现有分层导航流程图，并在其上补充第四章RGB-D可通行性分支和第五章任务层。第三章现有流程图路径为：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/06_footprint_mppi_flowchart.png`。
+-
+-# 完成的实验研究（论文第三章）
+-
+-## 分层导航总体结构
+-
+-当前已完成论文第三章的主要代码与正式实验。该章将四足机器人导航划分为上、下两层。上层以深度图、机器人位姿和局部目标为输入，输出机身坐标系下的期望速度命令；下层HIMLoco策略以期望速度、本体姿态、关节状态和历史动作等为输入，输出各关节控制量。上层规划更新与深度感知保持一致，速度命令以控制频率持续下发，避免因相机帧间隔造成控制中断。
+-
+-该结构的主要优点是接口清晰。规划器不需要学习四足动力学的全部细节，只需给出满足速度范围和转向约束的命令；底层策略不需要理解障碍语义，只需准确跟踪上层命令并保持稳定。内部消融和外部比较均固定使用相同HIMLoco模型，保证实验差异主要来自上层规划。
+-
+-**图3 分层导航系统结构（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/05_hierarchical_navigation_flowchart.png`。
+-
+-## HIMLoco强化学习运动控制
+-
+-HIMLoco是当前系统的底层运动控制基座。策略输入包括机身角速度、重力方向投影、期望线速度与角速度、关节位置与速度、足端接触或历史动作等状态，输出12自由度关节动作。动作经缩放后转换为关节目标或控制指令，由仿真器中的执行器模型驱动机器人。策略训练阶段通过地形随机化、动力学参数随机化和命令采样，提高对离散高度及模型误差的适应能力。
+-
+-第三章不把底层策略与上层规划同时优化，而是先引用前期小论文中HIMLoco与RAM的速度跟踪精度图，说明HIMLoco能够较稳定地跟踪前向速度和偏航角速度。随后所有导航方法共用该策略。这样既体现前期强化学习运动控制工作的连续性，也防止把规划器改进与步态策略改进混为一谈。
+-
+-**图4 HIMLoco与RAM速度跟踪精度对比（由小论文原图补入）**
+-
+-该图应放在第三章底层控制小节，正文需同步给出测试命令范围、均方误差或平均绝对误差，不宜只放曲线而无量化指标。
+-
+-## 深度图到局部BEV
+-
+-设深度图像像素为(u,v)，深度值为z，相机内参为(fx,fy,cx,cy)，则相机坐标系点可表示为：
+-
+-```text
+-Xc = (u - cx)z / fx
+-Yc = (v - cy)z / fy
+-Zc = z
+-```
+-
+-点云经相机到机身的外参变换和机身位姿变换后投影到局部栅格。系统过滤无效深度、超出有效范围的点及明显地面点，根据栅格内点的高度统计构建局部高度BEV。再依据障碍高度阈值生成原始占据图，并对地图边界、机器人附近无效区域和目标裁剪进行一致处理。
+-
+-早期系统曾依赖仿真演员类别过滤障碍，这种“真值白名单”会使视觉链路只保留预先指定物体，不能代表实际部署。当前正式实验已关闭该白名单，规划器仅使用相机深度构建障碍图，同时修复了边界墙和离散地形被误检为障碍的问题。场景中的岩石和树木启用真实碰撞，避免出现机器人穿过视觉模型的现象。
+-
+-**图5 RGB-D、BEV与代价规划过程（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/10_rgbd_bev_cost_planning_pipeline.png`。
+-
+-## 固定膨胀FMM与双层代价FMM
+-
+-固定膨胀FMM首先以固定半径对二值障碍图进行形态学膨胀，膨胀后的栅格全部设为不可通行，再从目标位置传播到达时间场。机器人沿到达时间下降方向选取前视点并生成转向命令。该方法实现简单，是本文内部消融的基础基线。但固定半径承担了两种互相冲突的作用：既要表示绝对碰撞边界，又要提供偏离障碍的安全余量。半径较小时容易贴边，半径较大时窄通道会被封闭。
+-
+-双层代价FMM将两种作用分开。硬层根据机器人最小安全边界定义绝对不可通行区域；软层在障碍外侧的安全距离范围内依据距离连续衰减。设栅格到最近障碍距离为d，硬安全半径为rh，软代价作用距离为rs，则可采用如下形式：
+-
+-```text
+-C(d) = +∞,                              d <= rh
+-C(d) = w[(rs - d)/(rs - rh)]^p,         rh < d < rs
+-C(d) = 0,                               d >= rs
+-```
+-
+-其中w为软代价权重，p控制衰减曲线。FMM传播时同时考虑空间步长和软代价，因此在开阔区主动远离障碍，而在确有必要时仍可经过满足硬尺寸要求的窄通道。当前配置中硬半径为0.20 m，软代价作用距离为0.65 m，权重为4.0，幂次为2.0；固定膨胀基线半径为0.25 m。
+-
+-**图6 双层软代价与FMM势场（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/14_soft_cost_and_fmm_potential.png`。
+-
+-## 双层代价FMM引导的足迹MPPI
+-
+-本文完整上层方法保留FMM的可达走廊能力，并在其上增加短时域MPPI优化。FMM提供由当前位置指向目标的参考路径，MPPI围绕上一时刻控制序列采样多组(vx,vy,wz)扰动，通过简化平面运动模型展开未来轨迹。每条轨迹的累计代价由目标推进、参考路径偏差、硬碰撞、连续软代价、控制幅值和控制变化共同组成：
+-
+-```text
+-J = wg Jgoal + wp Jpath + wh Jhard + ws Jsoft + wu Jcontrol + wdelta Jsmooth
+-```
+-
+-Go2在平面上采用0.72 m×0.42 m的矩形动态包络。对于每个预测位姿，不只检查中心栅格，而是将矩形足迹旋转和平移到对应位置，检测其覆盖区域是否进入硬障碍，并累计软安全代价。这样可以识别转弯过程中机身侧面扫到障碍的风险。当前MPPI单轮使用384条候选轨迹、20步预测时域，在12.5 Hz下更新优化结果，底层速度指令仍以50 Hz保持和下发。
+-
+-为减少空旷区域无意义转向，系统在局部地图没有障碍时使用连续目标直行；发现障碍后才启用FMM走廊和MPPI。系统同时设置转向承诺、停滞检测和受控脱困逻辑，降低左右方向频繁切换。此前尝试的世界坐标时序障碍记忆在固定筛选种子上没有带来稳定收益，并引入重影风险，因此正式方法关闭该模块。该负结果保留在研究记录中，但不作为论文贡献。
+-
+-**图7 足迹MPPI算法流程（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/06_footprint_mppi_flowchart.png`。
+-
+-## 理想VIO与位姿噪声模型
+-
+-仿真中的机器人真实位姿被定义为理想VIO输出，而不是默认假设实物能够直接获得世界坐标真值。噪声模型在上层规划输入处加入位置白噪声、航向白噪声、随机游走、固定延迟和随机丢帧。导航目标变换、BEV坐标转换和规划器均使用受扰位姿，仿真真值只在试验结束时计算真实终点误差和位姿RMS。
+-
+-该设置能够分离两类问题：若估计位姿下机器人已进入到达阈值，而真值误差仍较大，则记为VIO误到达；若位姿误差造成地图变形、路径偏移或碰撞，则反映定位误差对闭环导航的综合影响。后续实物部署时，需要采集D435i VIO与外部参考轨迹，按实测分布重新设置噪声参数。
+-
+-# 取得的实验数据及分析
+-
+-## 实验场景与评价指标
+-
+-正式实验使用同一种0至0.08 m离散高度地形，通过障碍数量构造三档难度。机器人起点位于走廊一端，横向位置在安全范围内随机生成，目标位于约24 m前方；大石头、树木和小碎石均由固定种子生成。相同种子下，不同规划方法的出生点、目标点、障碍位置和地形完全一致，并通过障碍布局哈希校验。
+-
+-| 难度 | 大石头 | 树木 | 小碎石 | 地形 | 固定种子数 |
+-| --- | ---: | ---: | ---: | --- | ---: |
+-| 简单 | 10 | 2 | 100 | 0至0.08 m离散高度 | 30 |
+-| 中等 | 15 | 3 | 200 | 0至0.08 m离散高度 | 30 |
+-| 困难 | 20 | 4 | 400 | 0至0.08 m离散高度 | 30 |
+-
+-每次试验最长60 s。严格成功要求机器人在规定时间内到达目标，且终止时真值距离不超过0.15 m。失败被划分为碰撞、卡住、跌倒和超时。主要评价指标包括：导航成功率及95% Wilson置信区间、成功样本到达时间、路径长度、角速度指令总变差、最小障碍净空、规划耗时均值与P95、机身接触次数、能耗代理指标及VIO位置和航向RMS。成功率比较使用同种子配对的McNemar精确检验，连续指标在共同成功样本上使用配对非参数检验。
+-
+-## 三种规划方法内部消融
+-
+-内部消融比较固定膨胀FMM、双层代价FMM和双层代价FMM引导的足迹MPPI。三档各方法运行30个配对种子，共270轮。所有进程正常结束，270份结果和日志齐全，相机不可用记录为0，配对布局哈希校验通过。
+-
+-| 难度 | 方法 | 成功率（95% Wilson CI） | 成功样本用时 | 路程 | 角速度变化 | 平均规划耗时 | 碰撞／卡住／超时 |
+-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+-| 简单 | 固定膨胀FMM | 17/30，56.7% [39.2%, 72.6%] | 42.49 s | 26.86 m | 0.0241 | 6.85 ms | 4／7／2 |
+-| 简单 | 双层代价FMM | 24/30，80.0% [62.7%, 90.5%] | 36.23 s | 26.51 m | 0.0247 | 6.61 ms | 2／3／1 |
+-| 简单 | 足迹MPPI | 25/30，83.3% [66.4%, 92.7%] | 34.21 s | 25.27 m | 0.0131 | 8.91 ms | 4／1／0 |
+-| 中等 | 固定膨胀FMM | 10/30，33.3% [19.2%, 51.2%] | 45.95 s | 26.88 m | 0.0267 | 4.37 ms | 1／14／5 |
+-| 中等 | 双层代价FMM | 10/30，33.3% [19.2%, 51.2%] | 41.97 s | 27.20 m | 0.0259 | 4.16 ms | 9／7／4 |
+-| 中等 | 足迹MPPI | 20/30，66.7% [48.8%, 80.8%] | 41.46 s | 26.33 m | 0.0127 | 6.21 ms | 3／5／2 |
+-| 困难 | 固定膨胀FMM | 3/30，10.0% [3.5%, 25.6%] | 50.58 s | 27.72 m | 0.0263 | 3.85 ms | 9／11／7 |
+-| 困难 | 双层代价FMM | 5/30，16.7% [7.3%, 33.6%] | 51.82 s | 28.91 m | 0.0282 | 4.03 ms | 7／12／6 |
+-| 困难 | 足迹MPPI | 14/30，46.7% [30.2%, 63.9%] | 43.38 s | 26.18 m | 0.0136 | 5.91 ms | 6／6／4 |
+-
+-简单档中，足迹MPPI相对固定膨胀FMM的成功率由56.7%提高到83.3%，但配对检验p=0.0574，接近而未达到常用0.05显著性水平；相对双层代价FMM的成功率差异不显著。中等档中，足迹MPPI相对两种FMM均为11个种子仅本文方法成功、1个种子仅对方成功，p=0.00635。困难档中，足迹MPPI相对固定膨胀FMM为12比1，p=0.00342；相对双层代价FMM为12比3，p=0.0352。结果说明，随着障碍密度上升，显式评价未来足迹和控制序列的重要性增加。
+-
+-三档中足迹MPPI的角速度变化分别为0.0131、0.0127和0.0136，约为两种FMM的一半，表明其输出指令更连续。规划耗时相比FMM增加约2至3 ms，但仍低于12.5 Hz规划周期80 ms，能够满足当前在线运行要求。该结果支持“本文方法在中高难度场景中提高成功率并显著改善控制平滑性”的结论，但不应写成所有难度和所有指标均显著优于基线。
+-
+-**图8 三档成功率及置信区间（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/01_success_rate_with_ci.png`。
+-
+-**图9 失败类型构成（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/02_outcome_composition.png`。
+-
+-**图10 平滑性与净空对比（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/03_smoothness_and_clearance.png`。
+-
+-## 近年外部方法对比
+-
+-外部对比选择iPlanner、PS-DWA和SAPF，与本文双层代价FMM引导的足迹MPPI共同运行。实验仍采用三档离散高度地形、30个固定种子、理想VIO、同一HIMLoco策略、60 s上限以及相同的到达和失败判据。为排除硬件对规划耗时的影响，四种方法全部在同一RTX 4060 8 GB显卡上重新运行，每档120轮，三档共360轮。
+-
+-| 难度 | 本文足迹MPPI | iPlanner | PS-DWA | SAPF |
+-| --- | ---: | ---: | ---: | ---: |
+-| 简单 | 25/30（83.3%） | 22/30（73.3%） | 13/30（43.3%） | 5/30（16.7%） |
+-| 中等 | 18/30（60.0%） | 19/30（63.3%） | 13/30（43.3%） | 4/30（13.3%） |
+-| 困难 | 10/30（33.3%） | 14/30（46.7%） | 6/30（20.0%） | 1/30（3.3%） |
+-| 三档合计 | 53/90（58.9%） | 55/90（61.1%） | 32/90（35.6%） | 10/90（11.1%） |
+-
+-iPlanner总成功数比本文方法多2次，但90组配对McNemar检验p=0.8388，差异不显著，因此不能声称本文方法或iPlanner在成功率上显著更高。本文方法相对PS-DWA为“仅本文成功28组、仅对方成功7组”，p=0.0005083；相对SAPF为45组对2组，p=1.60×10^-11，成功率优势显著。
+-
+-本文方法三档全样本平均规划耗时为5.82 ms，低于iPlanner的7.20 ms和PS-DWA的45.99 ms。SAPF平均规划耗时仅3.56 ms，但总体成功率为11.1%，在随机密集障碍中容易陷入局部极小。PS-DWA保留运动学前向模拟，但模式搜索和参考路径计算带来较高CPU开销，其成功率也低于本文方法。
+-
+-在本文方法与iPlanner共同成功的42个种子上，本文方法的路径平滑度为0.0363 rad，iPlanner为0.1517 rad，降低约76.0%，Wilcoxon检验p=1.65×10^-8；能耗代理指标分别为740.04和774.49，p=7.58×10^-5。iPlanner在这些共同成功样本上的平均到达时间更短，为32.58 s，而本文方法为36.57 s，p=0.000453。由此可得较为客观的结论：本文方法与iPlanner取得统计相当的成功率，本文方法在轨迹平滑性、能耗代理指标和规划开销方面更有优势，而iPlanner在共同成功样本中到达更快。
+-
+-**图11 外部方法三档成功率对比（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/19_external_success_rate.png`。
+-
+-**图12 总体成功率与规划耗时（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/20_external_overall_success_and_planning.png`。
+-
+-**图13 本文方法与iPlanner平滑度及到达时间（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/21_external_smoothness_and_time.png`。
+-
+-## VIO噪声鲁棒性分析
+-
+-VIO鲁棒性实验固定使用中等难度场景、足迹MPPI和同一组30个种子，仅改变上层位姿输入。四档共120轮，所有结果文件和日志完整，相机错误为0，同种子四档障碍布局哈希一致。
+-
+-| VIO档位 | 严格成功率 | 终止真值误差不超过0.20 m | VIO误到达 | 位置RMS | 航向RMS | 误到达最大误差 |
+-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+-| ideal | 17/30，56.7% | 17/30 | 0 | 0.000 m | 0.00° | - |
+-| mild | 7/30，23.3% | 15/30 | 8 | 0.033 m | 0.77° | 0.189 m |
+-| medium | 7/30，23.3% | 15/30 | 11 | 0.095 m | 1.70° | 0.368 m |
+-| severe | 5/30，16.7% | 8/30 | 12 | 0.191 m | 3.53° | 0.642 m |
+-
+-以真值误差不超过0.15 m作为严格成功判据，mild、medium和severe相对ideal的配对检验p值分别为0.00635、0.02127和0.00183，均显著下降。mild档的8次误到达全部位于0.151至0.189 m，说明严格阈值附近的轻微定位偏差会明显影响成功统计。若仅作阈值敏感性分析，将真值误差放宽至0.20 m，mild和medium均为15/30，与ideal差异不显著；severe仍只有8/30，说明较强漂移不仅影响终点判断，也会破坏闭环导航。
+-
+-该实验揭示了实物系统必须处理的问题。首先，系统不能只根据单帧VIO估计距离立即宣布到达，应要求连续多帧进入目标范围，并在速度降至零后再次确认。其次，长距离或高精度任务应结合目标视觉重定位、GPS、外部定位或回环校正。最后，当前噪声档位仅是仿真压力测试，不能直接等同于D435i在真实环境中的精度，实物阶段需要依据采集数据重新标定。
+-
+-**图14 VIO噪声下的导航成功率（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/16_vio_navigation_success.png`。
+-
+-**图15 位姿误差与误到达分析（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/17_vio_pose_error_and_false_arrival.png`。
+-
+-## 仿真过程与可视化结果
+-
+-除统计图外，当前已保存三档Isaac Gym场景、D435 RGB图、深度图、局部高度BEV、足迹障碍图、连续软代价图、FMM势场、MPPI候选及选中轨迹、固定俯视相机画面和路线叠加图。代表性素材使用相同布局种子20261001，三档共约1160个文件。截图实验仅用于展示感知与规划过程，不参与正式成功率统计。
+-
+-**图16 三档Isaac Gym场景对比（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/08_isaacgym_scene_comparison.png`。
+-
+-**图17 三档RGB与深度图对比（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/13_rgb_depth_difficulty_comparison.png`。
+-
+-**图18 规划轨迹与机器人实际路线（建议插入）**
+-
+-插图路径：`assets/runs/navigation_benchmark/ch3_paper_figures_20260925/09_scene_route_comparison.png`。
+-
+-## 实验结论
+-
+-目前第三章已形成较完整的证据链。底层HIMLoco提供统一运动执行能力；深度图到BEV链路在关闭仿真真值白名单后能够独立工作；双层代价把绝对碰撞边界和安全偏好分开；足迹MPPI利用短时域预测显式检查机身运动包络，并显著降低角速度指令变化。内部消融表明，本文方法在中等和困难障碍密度下相对两种FMM显著提高成功率。外部比较表明，本文方法与iPlanner成功率统计相当，轨迹更平滑且规划耗时较低，同时相对PS-DWA和SAPF具有显著成功率优势。
+-
+-实验也给出了明确限制。其一，iPlanner在共同成功样本中平均到达时间更短，本文方法不能宣称所有指标最优。其二，VIO误差会显著影响严格到达判定，实物系统需增加终点确认和定位冗余。其三，时序障碍记忆未在当前静态随机场景中获得稳定收益，因此不列为主要贡献。其四，当前第三章主要处理几何障碍，尚不能可靠区分草地、低矮碎石和可跨越台阶，这正是第四章视觉可通行性学习需要解决的问题。
+-
+-# 成果及下一步计划
+-
+-## 已取得成果
+-
+-1. 已完成HIMLoco底层强化学习运动控制与上层局部导航的统一接口，明确了从目标、位姿、RGB-D、BEV、规划速度到关节动作的完整输入输出链路。
+-
+-2. 已实现深度图到局部BEV的在线处理，关闭仿真演员真值白名单，并完成边界墙、离散地形误检和障碍碰撞模型修复。
+-
+-3. 已实现固定膨胀FMM、双层代价FMM及双层代价FMM引导的足迹MPPI。完整方法能够对0.72 m×0.42 m机身包络进行轨迹级碰撞检测，并输出较连续的速度指令。
+-
+-4. 已完成简单、中等、困难三档随机障碍内部消融，共270轮正式试验；已完成ideal、mild、medium、severe四档VIO鲁棒性试验，共120轮。
+-
+-5. 已将iPlanner官方预训练网络接入统一闭环，并依据论文实现SAPF和PS-DWA接口。已完成三档外部对比共360轮，形成成功率、规划耗时、平滑度、能耗和失败类型等统计结果。
+-
+-6. 已建立批量实验、断点续跑、布局哈希校验、日志保存、统计检验和论文图生成流程。当前第三章相关正式实验共750轮，不含前期冒烟、筛选和截图试验。
+-
+-7. 已生成第三章统计图、算法流程图、Isaac Gym场景图、RGB-D图、BEV图、连续软代价图和轨迹图等论文素材，并保留原始CSV、JSON、日志、PNG和矢量PDF文件。
+-
+-8. 【请补充个人真实成果】已发表／在投论文、专利、软件著作权、竞赛获奖和项目参与情况。此处不得填写尚未提交或无法证明的成果。
+-
+-## 当前存在的问题
+-
+-第一，当前视觉链路主要使用深度几何阈值，尚未形成可训练的RGB-D连续可通行性模型。对于高草、灌木、低矮碎石和可跨越台阶，二值障碍图可能过于保守或产生错误分类。
+-
+-第二，VIO噪声实验已说明定位是系统性能的重要限制，但当前噪声参数仍来自人工压力档位，缺少D435i实测轨迹对照。不同光照、纹理和运动速度下的实测漂移需要进一步量化。
+-
+-第三，第三章外部方法比较已完成，但SAPF和PS-DWA属于在统一接口下依据论文方法实现，论文中必须说明适配方式；iPlanner使用公开预训练网络，也应说明深度单位、输入尺寸、目标裁剪和路径跟踪器的差异，保证复现表述准确。
+-
+-第四，仿真中使用的障碍物和地形仍比真实灾后环境规则，尚未覆盖动态人员、松散材料、强反光、室外阳光干扰和通信延迟。实物测试需要逐级增加风险，不能直接照搬仿真速度参数。
+-
+-第五，完整自主探索还需要任务层子目标生成和人员检测。当前第三章解决的是已知局部目标下的视觉局部导航，不应将其表述为已经完成全自主灾后搜索。
+-
+-## 下一步计划
+-
+-### 第一阶段：完成论文第三章整理
+-
+-统一方法命名、公式、符号和参数表，整理HIMLoco与RAM跟踪精度原图，将三档内部消融、外部方法对比和VIO鲁棒性结果写入第三章。重点核查试验数量、显著性结论和硬件说明，确保正文、表格、图片与原始统计文件一致。该阶段不再增加新的专门场景，以控制硕士论文工作量。
+-
+-### 第二阶段：开展视觉可通行性学习
+-
+-建立适用于当前场景的RGB-D数据生成与标注流程。几何分支提取高度差、坡度、粗糙度和净空，视觉分支提取语义或自监督图像特征，融合后输出0至1连续可通行代价。训练与验证数据按场景划分，避免相邻帧泄漏。感知评价包括IoU、AUC、危险区域漏检率和代价校准误差；闭环评价比较纯深度固定膨胀FMM、纯深度足迹MPPI以及视觉可通行性足迹MPPI。ViPlanner或WVN类方法作为第四章参考对比，具体数量根据模型接入和实验周期控制。
+-
+-### 第三阶段：完成Go2与D435i实物链路
+-
+-完成相机安装和外参标定，验证深度尺度、时间戳、IMU方向和坐标系；部署VIO并采集室内外重复轨迹，统计位置与航向误差；打通ROS2图像、位姿、规划速度和Go2控制接口。测试顺序为静止感知、原地转向、低速直行、单障碍绕行、稀疏随机障碍、混合地形。每一步均设置速度上限、遥控急停和安全员。
+-
+-### 第四阶段：完成系统集成与第五章实验
+-
+-将第三章几何规划器、第四章连续可通行性模型和HIMLoco整合。任务目标可由操作者给定方向与相对距离，条件允许时加入GPS航点或前沿探索子目标；人员检测只作为任务触发，不与局部规划同时重新训练。完整系统至少比较“纯深度+固定膨胀FMM”“纯深度+足迹MPPI”和“视觉可通行性+足迹MPPI”三种配置，并记录成功率、碰撞、人工接管、规划频率和实机能耗。
+-
+-### 第五阶段：完成论文撰写与答辩准备
+-
+-按照六章结构完成全文：第一章绪论，第二章理论基础与系统建模，第三章分层运动控制与有限视野局部规划，第四章视觉可通行性学习，第五章系统集成与实物部署，第六章总结与展望。完成图表统一、参考文献核对、重复率检查、实验视频整理和答辩演示。对未完成或效果不稳定的内容如实说明，不将未来工作写成已完成贡献。
+-
+-## 预期进度安排
+-
+-| 时间 | 主要任务 | 预期产出 |
+-| --- | --- | --- |
+-| 【第1月】 | 整理第三章方法、公式、图表和HIMLoco跟踪实验 | 第三章完整初稿 |
+-| 【第2月至第3月】 | 构建RGB-D可通行性数据与模型，完成离线评价 | 第四章方法与感知实验 |
+-| 【第4月】 | 完成闭环导航对比和模型消融 | 第四章完整初稿 |
+-| 【第5月】 | Go2+D435i标定、VIO实测和低速避障 | 实物基础数据与安全测试记录 |
+-| 【第6月】 | 完成系统集成、实物对比和失败分析 | 第五章完整初稿、演示视频 |
+-| 【第7月】 | 全文修改、格式检查、预答辩与答辩准备 | 学位论文定稿与答辩材料 |
+-
+-## 预期论文贡献
+-
+-1. 构建一套以HIMLoco强化学习运动控制为底层、以RGB-D局部感知与速度规划为上层的四足机器人分层导航框架，并形成从仿真到实物的统一接口。
+-
+-2. 提出双层代价FMM引导的足迹MPPI局部规划方法，通过硬碰撞层、连续软安全代价和矩形机身轨迹包络兼顾障碍净空、窄区域通行与控制平滑性。
+-
+-3. 建立包含三档随机障碍、固定配对种子、VIO噪声和多类评价指标的闭环实验体系，并在同一HIMLoco底层上与近年局部规划方法进行公平比较。
+-
+-4. 【待第四章完成后确认】提出RGB-D语义与几何融合的连续可通行性估计方法，为树木、岩石、草地、碎石和可跨越地形提供比二值障碍更细致的规划代价。
+-
+-5. 【待第五章完成后确认】在Go2与D435i平台上完成无先验地图局部导航系统验证，分析视觉感知、VIO定位、规划和强化学习运动控制在真实复杂地形中的协同效果与适用边界。
+-
+-> 中期结论：目前课题已完成第三章的算法实现、内部消融、近年方法对比、VIO鲁棒性实验以及论文图表整理，核心几何局部规划链路具备完整数据支撑。下一阶段的主要工作是第四章RGB-D连续可通行性学习和第五章Go2实物系统集成。按现有进度，课题技术路线清晰、实验基础较完整，具备继续完成硕士学位论文的条件。
+diff --git a/legged_gym/legged_gym/envs/go2/bev_height_mapper.py b/legged_gym/legged_gym/envs/go2/bev_height_mapper.py
+index 2a9b054..d13fe25 100644
+--- a/legged_gym/legged_gym/envs/go2/bev_height_mapper.py
++++ b/legged_gym/legged_gym/envs/go2/bev_height_mapper.py
+@@ -370,6 +370,47 @@ class BEVMapper:
+             return np.maximum(occ_now, self.occ_memory)
+         return occ_now
+ 
++    def get_traversability_cost(self, occ_bev=None, unknown_cost=0.0,
++                                height_scale=None, step_scale=None,
++                                obstacle_cost=1.0):
++        """Return a continuous local traversability risk map in ``[0, 1]``.
++
++        This is the lightweight fourth-chapter label/upper-bound signal:
++        continuous cost is computed from local height variation and sudden
++        forward height changes, while hard obstacles are assigned the maximum
++        risk. A learned RGB-D module can later regress this same BEV target.
++        """
++        valid = self.count >= self.min_points
++        height_range = np.where(valid, self.max_z - self.min_z, 0.0)
++        h_scale = (self.height_range_thresh if height_scale is None
++                   else float(height_scale))
++        h_scale = max(h_scale, 1e-6)
++        rough_cost = np.clip(height_range / h_scale, 0.0, 1.0)
++
++        s_scale = (self.height_range_thresh if step_scale is None
++                   else float(step_scale))
++        s_scale = max(s_scale, 1e-6)
++        step_cost = np.zeros((self.H, self.W), dtype=np.float32)
++        span = max(1, int(self.step_span))
++        if span < self.H:
++            min_z_safe = np.where(valid, self.min_z, np.nan)
++            max_z_safe = np.where(valid, self.max_z, np.nan)
++            step_up = max_z_safe[span:, :] - min_z_safe[:-span, :]
++            ok = np.isfinite(step_up)
++            step_region = step_cost[span:, :]
++            step_region[ok] = np.clip(step_up[ok] / s_scale, 0.0, 1.0)
++            step_cost[span:, :] = step_region
++
++        cost = np.maximum(rough_cost, step_cost).astype(np.float32)
++        if unknown_cost > 0.0:
++            cost[~valid] = float(np.clip(unknown_cost, 0.0, 1.0))
++        if occ_bev is not None and obstacle_cost > 0.0:
++            occ = np.asarray(occ_bev, dtype=bool)
++            if occ.shape != cost.shape:
++                raise ValueError("occ_bev shape does not match traversability map")
++            cost[occ] = float(np.clip(obstacle_cost, 0.0, 1.0))
++        return np.clip(cost, 0.0, 1.0).astype(np.float32)
++
+     def shift_with_motion(self, dx_w, dy_w, yaw):
+         """
+         dx_w, dy_w : world frame 位移
+@@ -457,6 +498,7 @@ class FMMGradientController:
+         soft_clearance_m=0.65,
+         soft_cost_weight=4.0,
+         soft_cost_power=2.0,
++        traversability_cost_weight=0.0,
+         # --- 转向决策锁存（修复对称鞍点处 wz 逐步振荡导致的原地打转）---
+         hysteresis_thresh=0.0,    # 梯度横向分量小于该值时沿用上次转向符号；0=关闭
+         hysteresis_hold_steps=0,  # 转向符号最少保持多少步；0=关闭
+@@ -480,6 +522,7 @@ class FMMGradientController:
+         self.soft_clearance_m = float(soft_clearance_m)
+         self.soft_cost_weight = float(soft_cost_weight)
+         self.soft_cost_power = float(soft_cost_power)
++        self.traversability_cost_weight = float(traversability_cost_weight)
+ 
+         if self.hard_radius_m < 0.0:
+             raise ValueError("hard_radius_m must be >= 0")
+@@ -489,6 +532,8 @@ class FMMGradientController:
+             raise ValueError("soft_cost_weight must be >= 0")
+         if self.soft_cost_power <= 0.0:
+             raise ValueError("soft_cost_power must be > 0")
++        if self.traversability_cost_weight < 0.0:
++            raise ValueError("traversability_cost_weight must be >= 0")
+ 
+         self.H = int(self.bev_x / self.bev_res)
+         self.W = int(self.bev_y / self.bev_res)
+@@ -499,6 +544,7 @@ class FMMGradientController:
+         self.fmm_dist = None
+         self.hard_obstacle_map = None
+         self.soft_cost_map = None
++        self.traversability_cost_map = None
+         self.travel_speed_map = None
+         self.obstacle_clearance_map = None
+         self._path_cache = None
+@@ -581,7 +627,7 @@ class FMMGradientController:
+ 
+         return hard_occ, soft_cost
+ 
+-    def update(self, occ_bev):
++    def update(self, occ_bev, traversability_cost=None):
+         self._path_cache = None
+         if self.goal_rc is None:
+             self.fmm_dist = None
+@@ -604,6 +650,17 @@ class FMMGradientController:
+ 
+         self.hard_obstacle_map = occ.copy()
+         self.soft_cost_map = soft_cost
++        if traversability_cost is None:
++            trav_cost = np.zeros_like(soft_cost, dtype=np.float32)
++        else:
++            trav_cost = np.asarray(traversability_cost, dtype=np.float32)
++            if trav_cost.shape != soft_cost.shape:
++                raise ValueError(
++                    "traversability_cost shape %s does not match planner shape %s"
++                    % (trav_cost.shape, soft_cost.shape))
++            trav_cost = np.clip(trav_cost, 0.0, 1.0)
++            trav_cost[occ > 0] = 1.0
++        self.traversability_cost_map = trav_cost
+ 
+         #  2) traversable: 1 free / 0 obstacle
+         traversable = (1 - occ).astype(np.float32)
+@@ -616,9 +673,11 @@ class FMMGradientController:
+         # goal 如果落在障碍里：直接把它钳成 free（否则 skfmm 会返回 mask 常量）
+         trav_ma[gr, gc] = 0.0
+ 
+-        if self.use_soft_cost:
++        if self.use_soft_cost or self.traversability_cost_weight > 0.0:
+             # 代价越高，传播速度越慢；travel_time 因而偏好更大的障碍净空。
+-            speed = 1.0 / (1.0 + self.soft_cost_weight * soft_cost)
++            speed = 1.0 / (
++                1.0 + self.soft_cost_weight * soft_cost
++                + getattr(self, "traversability_cost_weight", 0.0) * trav_cost)
+             speed = np.maximum(speed, 1e-3).astype(np.float32)
+             speed_ma = ma.array(speed, mask=ma.getmaskarray(trav_ma))
+             speed_ma[gr, gc] = 1.0
+diff --git a/legged_gym/legged_gym/envs/go2/mppi_local_planner.py b/legged_gym/legged_gym/envs/go2/mppi_local_planner.py
+index 8a1b92a..0f39758 100644
+--- a/legged_gym/legged_gym/envs/go2/mppi_local_planner.py
++++ b/legged_gym/legged_gym/envs/go2/mppi_local_planner.py
+@@ -141,7 +141,8 @@ class FootprintMPPIController:
+                  variant="standard", ut_alpha=1.0, ut_kappa=0.5,
+                  ut_beta=2.0, ut_initial_position_var=0.001,
+                  ut_initial_yaw_var=0.001, ut_risk_gamma=1.0,
+-                 ut_smoothing_window=7):
++                 ut_smoothing_window=7,
++                 traversability_cost_weight=0.0):
+         self.bev_res = float(bev_res)
+         self.bev_x = float(bev_x)
+         self.bev_y = float(bev_y)
+@@ -167,8 +168,11 @@ class FootprintMPPIController:
+         self.ut_initial_yaw_var = float(ut_initial_yaw_var)
+         self.ut_risk_gamma = float(ut_risk_gamma)
+         self.ut_smoothing_window = int(ut_smoothing_window)
++        self.traversability_cost_weight = float(traversability_cost_weight)
+         if self.ut_alpha <= 0.0 or 3.0 + self.ut_kappa <= 0.0:
+             raise ValueError("invalid unscented-transform scaling parameters")
++        if self.traversability_cost_weight < 0.0:
++            raise ValueError("traversability_cost_weight must be >= 0")
+ 
+         length = float(footprint_length_m) + 2.0 * float(safety_margin_m)
+         width = float(footprint_width_m) + 2.0 * float(safety_margin_m)
+@@ -341,7 +345,8 @@ class FootprintMPPIController:
+             hit[visible] |= np.asarray(occ_bev, dtype=bool)[rows[visible], cols[visible]]
+         return np.any(hit, axis=1).reshape(original_shape)
+ 
+-    def _trajectory_cost(self, states, controls, targets, occ_bev):
++    def _trajectory_cost(self, states, controls, targets, occ_bev,
++                         traversability_cost=None):
+         error = states[:, :, :2] - targets[None, :, :]
+         track_cost = 5.0 * np.sum(error * error, axis=(1, 2))
+         terminal_error = states[:, -1, :2] - targets[-1]
+@@ -363,13 +368,24 @@ class FootprintMPPIController:
+         proximity = np.clip(0.65 - center_clearance, 0.0, 0.65) / 0.65
+         proximity_cost = 18.0 * np.sum(proximity * proximity, axis=1)
+ 
++        terrain_cost = 0.0
++        if (traversability_cost is not None
++                and self.traversability_cost_weight > 0.0):
++            risk = np.asarray(traversability_cost, dtype=np.float32)
++            if risk.shape != (self.H, self.W):
++                raise ValueError("traversability_cost shape does not match MPPI BEV")
++            sampled_risk = risk[rows, cols]
++            terrain_cost = (
++                self.traversability_cost_weight
++                * np.sum(sampled_risk * sampled_risk, axis=1))
++
+         du = np.diff(controls, axis=1)
+         smooth_cost = (1.5 * np.sum(du[:, :, 0] ** 2, axis=1)
+                        + 4.0 * np.sum(du[:, :, 1] ** 2, axis=1))
+         effort_cost = (0.08 * np.sum((self.max_vx - controls[:, :, 0]) ** 2, axis=1)
+                        + 0.35 * np.sum(controls[:, :, 1] ** 2, axis=1))
+         return (track_cost + terminal_cost + heading_cost + collision_cost
+-                + proximity_cost + smooth_cost + effort_cost), collision
++                + proximity_cost + terrain_cost + smooth_cost + effort_cost), collision
+ 
+     def _risk_sensitive_tracking_cost(self, means, covariances, targets,
+                                       track_weight, terminal_weight):
+@@ -398,13 +414,15 @@ class FootprintMPPIController:
+         return np.sum(running, axis=1) + terminal
+ 
+     def _unscented_cost(self, sigma_states, mean_states, covariances,
+-                        controls, targets, occ_bev, mean_weights):
++                        controls, targets, occ_bev, mean_weights,
++                        traversability_cost=None):
+         batch_count, sigma_count = sigma_states.shape[:2]
+         flat_states = sigma_states.reshape(
+             batch_count * sigma_count, self.horizon, 3)
+         repeated_controls = np.repeat(controls, sigma_count, axis=0)
+         sigma_costs, sigma_collision = self._trajectory_cost(
+-            flat_states, repeated_controls, targets, occ_bev)
++            flat_states, repeated_controls, targets, occ_bev,
++            traversability_cost=traversability_cost)
+         sigma_costs = sigma_costs.reshape(batch_count, sigma_count)
+         sigma_collision = sigma_collision.reshape(
+             batch_count, sigma_count, self.horizon)
+@@ -434,7 +452,8 @@ class FootprintMPPIController:
+         smoothed[:, 1] = np.clip(smoothed[:, 1], -self.max_wz, self.max_wz)
+         return smoothed
+ 
+-    def _command_unscented(self, occ, targets, desired_heading):
++    def _command_unscented(self, occ, targets, desired_heading,
++                           traversability_cost=None):
+         sigma_count = 7
+         batch_count = max(2, self.num_samples // sigma_count)
+         controls = self._sample_controls(desired_heading, count=batch_count)
+@@ -442,7 +461,8 @@ class FootprintMPPIController:
+             self._rollout_unscented(controls))
+         costs, sigma_collision, _ = self._unscented_cost(
+             sigma_states, mean_states, covariances,
+-            controls, targets, occ, mean_weights)
++            controls, targets, occ, mean_weights,
++            traversability_cost=traversability_cost)
+         finite = np.isfinite(costs)
+         if not np.any(finite):
+             return None
+@@ -463,24 +483,30 @@ class FootprintMPPIController:
+         self.last_state_covariance = covariances[best_idx].copy()
+         return self._u[0].copy()
+ 
+-    def command(self, occ_bev, path_xy, goal_xy=None):
++    def command(self, occ_bev, path_xy, goal_xy=None, traversability_cost=None):
+         occ = np.asarray(occ_bev, dtype=np.uint8)
+         if occ.shape != (self.H, self.W):
+             raise ValueError("occ_bev shape does not match MPPI BEV")
++        risk = None
++        if traversability_cost is not None:
++            risk = np.asarray(traversability_cost, dtype=np.float32)
++            if risk.shape != (self.H, self.W):
++                raise ValueError("traversability_cost shape does not match MPPI BEV")
+         targets = self._path_targets(path_xy)
+         if not np.any(targets) and goal_xy is not None:
+             targets[:] = np.asarray(goal_xy, dtype=np.float64)[:2]
+         desired_heading = math.atan2(targets[min(3, self.horizon - 1), 1],
+                                      max(0.05, targets[min(3, self.horizon - 1), 0]))
+         if self.variant == "unscented":
+-            cmd = self._command_unscented(occ, targets, desired_heading)
++            cmd = self._command_unscented(
++                occ, targets, desired_heading, traversability_cost=risk)
+             if cmd is None:
+                 return 0.0, 0.0
+         else:
+             controls = self._sample_controls(desired_heading)
+             states = self._rollout(controls)
+             costs, collision = self._trajectory_cost(
+-                states, controls, targets, occ)
++                states, controls, targets, occ, traversability_cost=risk)
+             finite = np.isfinite(costs)
+             if not np.any(finite):
+                 return 0.0, 0.0
+diff --git a/legged_gym/legged_gym/envs/go2/pathplanner.py b/legged_gym/legged_gym/envs/go2/pathplanner.py
+index 286e30e..c118616 100644
+--- a/legged_gym/legged_gym/envs/go2/pathplanner.py
++++ b/legged_gym/legged_gym/envs/go2/pathplanner.py
+@@ -200,6 +200,8 @@ class Evaluator:
+         self.trial_narrow_steps = 0
+         self.trial_min_path_clearance = float("inf")
+         self.trial_memory_max_points = 0
++        self.trial_traversability_path_mean = []
++        self.trial_traversability_path_max = []
+         self.mode = mode
+         self.mppi = None
+         if self.mode in ('fmm', 'mppi'):
+@@ -215,6 +217,9 @@ class Evaluator:
+                 soft_clearance_m=FMM_SOFT_CLEARANCE_M,
+                 soft_cost_weight=FMM_SOFT_COST_WEIGHT,
+                 soft_cost_power=FMM_SOFT_COST_POWER,
++                traversability_cost_weight=(
++                    FMM_TRAVERSABILITY_COST_WEIGHT
++                    if TRAVERSABILITY_COST_ENABLE else 0.0),
+                 # 转向决策锁存：压住对称鞍点处 wz 的逐步振荡（见 viz_config.FMM_TURN_*）
+                 hysteresis_thresh=(FMM_TURN_HYSTERESIS_THRESH
+                                    if FMM_TURN_HYSTERESIS_ENABLE else 0.0),
+@@ -251,6 +256,9 @@ class Evaluator:
+                     ut_initial_yaw_var=U_MPPI_INITIAL_YAW_VAR,
+                     ut_risk_gamma=U_MPPI_RISK_GAMMA,
+                     ut_smoothing_window=U_MPPI_SMOOTHING_WINDOW,
++                    traversability_cost_weight=(
++                        MPPI_TRAVERSABILITY_COST_WEIGHT
++                        if TRAVERSABILITY_COST_ENABLE else 0.0),
+                 )
+         elif self.mode == 'rrt':
+             self.fmm = RRTController(
+@@ -373,6 +381,8 @@ class Evaluator:
+         self.trial_narrow_steps = 0
+         self.trial_min_path_clearance = float("inf")
+         self.trial_memory_max_points = 0
++        self.trial_traversability_path_mean = []
++        self.trial_traversability_path_max = []
+         initial_true_pose = (
+             float(self.env.root_states[0, 0].item()),
+             float(self.env.root_states[0, 1].item()),
+@@ -478,6 +488,13 @@ class Evaluator:
+             else:
+                 occ_bev = occ_bev_now
+ 
++            traversability_cost = None
++            if TRAVERSABILITY_COST_ENABLE:
++                traversability_cost = self.bev.get_traversability_cost(
++                    occ_bev=occ_bev,
++                    unknown_cost=TRAVERSABILITY_UNKNOWN_COST,
++                    obstacle_cost=TRAVERSABILITY_OBSTACLE_COST)
++
+             # 3) 计算 waypoint 在机器人坐标（goal_xy_bev）
+             wp = self.planner.waypoints[self.planner.current_id]
+             dx_w = wp[0] - nav_x
+@@ -501,7 +518,11 @@ class Evaluator:
+                 if self.mode == 'iplanner':
+                     self.fmm.set_depth(self._last_depth_pos)
+                 start_plan_t = time.time()
+-                self.fmm.update(occ_bev)
++                if self.mode in ('fmm', 'mppi'):
++                    self.fmm.update(
++                        occ_bev, traversability_cost=traversability_cost)
++                else:
++                    self.fmm.update(occ_bev)
+                 self.trial_step_times.append((time.time() - start_plan_t) * 1000)
+                 self._cached_raw_path = self.fmm.extract_path()
+                 if hasattr(self.fmm, "is_reachable"):
+@@ -523,6 +544,18 @@ class Evaluator:
+                 raw_xy.append([wx, wy])
+             raw_xy = np.array(raw_xy)
+             self._record_trial_fmm_segment(step, raw_xy)
++            if traversability_cost is not None and raw_path:
++                risk_values = [
++                    float(traversability_cost[r, col])
++                    for r, col in raw_path
++                    if 0 <= r < traversability_cost.shape[0]
++                    and 0 <= col < traversability_cost.shape[1]
++                ]
++                if risk_values:
++                    self.trial_traversability_path_mean.append(
++                        float(np.mean(risk_values)))
++                    self.trial_traversability_path_max.append(
++                        float(np.max(risk_values)))
+ 
+             # ===== 4. 保存 =====
+             if step == 0: 
+@@ -549,7 +582,8 @@ class Evaluator:
+                         ], dtype=np.float64)
+                         start_mppi_t = time.time()
+                         self._cached_mppi_cmd = self.mppi.command(
+-                            occ_bev, local_path_xy, goal_xy=(dx_r, dy_r))
++                            occ_bev, local_path_xy, goal_xy=(dx_r, dy_r),
++                            traversability_cost=traversability_cost)
+                         mppi_ms = (time.time() - start_mppi_t) * 1000.0
+                         if self.trial_step_times:
+                             self.trial_step_times[-1] += mppi_ms
+@@ -2095,6 +2129,10 @@ class Evaluator:
+         yaw = np.asarray(self.trial_vio_yaw_errors, dtype=np.float64)
+         plan = np.asarray(self.trial_step_times, dtype=np.float64)
+         smooth = np.asarray(self.trial_step_smoothness, dtype=np.float64)
++        trav_mean = np.asarray(
++            self.trial_traversability_path_mean, dtype=np.float64)
++        trav_max = np.asarray(
++            self.trial_traversability_path_max, dtype=np.float64)
+         record = {
+             "success": bool(success),
+             "failure_reason": str(reason),
+@@ -2105,6 +2143,13 @@ class Evaluator:
+             "temporal_memory": bool(self._use_temporal_memory),
+             "soft_cost": (bool(FMM_USE_SOFT_COST)
+                           if self.mode in ('fmm', 'mppi') else None),
++            "traversability_cost": bool(TRAVERSABILITY_COST_ENABLE),
++            "traversability_fmm_weight": (
++                float(FMM_TRAVERSABILITY_COST_WEIGHT)
++                if TRAVERSABILITY_COST_ENABLE else 0.0),
++            "traversability_mppi_weight": (
++                float(MPPI_TRAVERSABILITY_COST_WEIGHT)
++                if TRAVERSABILITY_COST_ENABLE else 0.0),
+             "actor_truth_whitelist": bool(BEV_OBSTACLE_ACTORS_ONLY),
+             "vio_noise_level": VIO_NOISE_LEVEL,
+             "elapsed_s": float(elapsed_time),
+@@ -2112,6 +2157,12 @@ class Evaluator:
+             "planning_mean_ms": float(plan.mean()) if plan.size else 0.0,
+             "planning_p95_ms": float(np.percentile(plan, 95)) if plan.size else 0.0,
+             "path_smoothness_mean": float(smooth.mean()) if smooth.size else None,
++            "traversability_path_mean": (
++                float(trav_mean.mean()) if trav_mean.size else None),
++            "traversability_path_p95": (
++                float(np.percentile(trav_mean, 95)) if trav_mean.size else None),
++            "traversability_path_max": (
++                float(trav_max.max()) if trav_max.size else None),
+             "energy_torque_sq_mean": float(metrics["energy"]),
+             "cmd_wz_variation": float(metrics["cmd_wz_variation"]),
+             "cmd_wz_sign_flips": int(metrics["cmd_wz_sign_flips"]),
+diff --git a/legged_gym/legged_gym/envs/go2/viz_config.py b/legged_gym/legged_gym/envs/go2/viz_config.py
+index f7a8cd8..4a807b7 100644
+--- a/legged_gym/legged_gym/envs/go2/viz_config.py
++++ b/legged_gym/legged_gym/envs/go2/viz_config.py
+@@ -685,10 +685,11 @@ POLICY_EXPERIMENT_NAME = "rough_go2"   #: logs/ 下的实验名（对应 runner.
+ #: 留空 = 默认 logs/<experiment_name>；也可填绝对路径的 log_root
+ POLICY_LOG_ROOT = os.path.join(LOGS_ROOT, POLICY_EXPERIMENT_NAME)
+ #: 该实验下当前唯一训练到 1200 迭代的 run（其余都是 2~60 迭代的冒烟测试）
+-POLICY_LOAD_RUN = os.path.join(
+-    LOGS_ROOT, "go2_new_reward", "Dec10_20-00-07_")
++POLICY_LOAD_RUN = os.environ.get(
++    "HIMLOCO_POLICY_LOAD_RUN",
++    os.path.join(LOGS_ROOT, "Dec10_20-00-07_"))
+ #: -1 = 取该 run 里编号最大的 model_*.pt；填数字则取 model_<N>.pt
+-POLICY_CHECKPOINT = 1200
++POLICY_CHECKPOINT = _env_int("HIMLOCO_POLICY_CHECKPOINT", 1200)
+ 
+ 
+ # =====================================================================
+@@ -1816,6 +1817,20 @@ FMM_SOFT_COST_WEIGHT = 4.0
+ #: 软代价曲线指数。2.0 让远端影响平缓、靠近硬边界时快速增强。
+ FMM_SOFT_COST_POWER = 2.0
+ 
++# ---------- 第四章：连续可通行性风险代价（默认关闭） ----------
++#: 启用后，BEVMapper 会从局部高度起伏/台阶变化生成 [0,1] 连续可通行代价，
++#: 并把它同时加入 FMM 传播速度和 MPPI 候选轨迹代价。该解析代价是第四章
++#: RGB-D 可通行性学习的标签/上限信号；训练模型前先用于闭环 ablation。
++TRAVERSABILITY_COST_ENABLE = _env_bool("HIMLOCO_TRAVERSABILITY_COST", False)
++#: 未观测区域风险；当前保持 0，避免单前视相机把视野外区域全部变成保守障碍。
++TRAVERSABILITY_UNKNOWN_COST = _env_float("HIMLOCO_TRAVERSABILITY_UNKNOWN_COST", 0.0)
++#: 硬障碍格的风险代价。通常设为 1，由 FMM 硬层和 MPPI 碰撞项共同约束。
++TRAVERSABILITY_OBSTACLE_COST = _env_float("HIMLOCO_TRAVERSABILITY_OBSTACLE_COST", 1.0)
++#: FMM travel-time 中可通行性代价权重；越大越倾向绕开粗糙/台阶风险区。
++FMM_TRAVERSABILITY_COST_WEIGHT = _env_float("HIMLOCO_FMM_TRAV_WEIGHT", 2.0)
++#: MPPI 轨迹代价中的可通行性风险权重。
++MPPI_TRAVERSABILITY_COST_WEIGHT = _env_float("HIMLOCO_MPPI_TRAV_WEIGHT", 6.0)
++
+ # ---------- 转向决策锁存（⚠ 修复 wz 逐步振荡导致的原地打转） ----------
+ #: 问题（2026-09-16 实测定位）：当 goal 与机器人连线【正对】一个障碍时，
+ #:   左右绕行代价相同，FMM 距离场的横向梯度在 0 附近抖动，其符号每步翻转，
+diff --git a/legged_gym/legged_gym/scripts/run_navigation_benchmark.py b/legged_gym/legged_gym/scripts/run_navigation_benchmark.py
+index fc533e3..f96d076 100644
+--- a/legged_gym/legged_gym/scripts/run_navigation_benchmark.py
++++ b/legged_gym/legged_gym/scripts/run_navigation_benchmark.py
+@@ -33,6 +33,14 @@ METHODS = {
+         "HIMLOCO_MPPI_VARIANT": "unscented",
+         "HIMLOCO_FMM_SOFT_COST": "1",
+         "HIMLOCO_TEMPORAL_MEMORY": "0",
++        "HIMLOCO_TRAVERSABILITY_COST": "0",
++    },
++    "umppi_trav": {
++        "HIMLOCO_PLANNER_MODE": "mppi",
++        "HIMLOCO_MPPI_VARIANT": "unscented",
++        "HIMLOCO_FMM_SOFT_COST": "1",
++        "HIMLOCO_TEMPORAL_MEMORY": "0",
++        "HIMLOCO_TRAVERSABILITY_COST": "1",
+     },
+     "mppi_memory": {
+         "HIMLOCO_PLANNER_MODE": "mppi",
+@@ -63,6 +71,7 @@ METHOD_DISPLAY_NAMES = {
+     "fmm_soft": "双层代价FMM",
+     "mppi": "双层代价FMM引导的足迹MPPI",
+     "umppi": "双层代价FMM引导的足迹U-MPPI（Ours）",
++    "umppi_trav": "连续可通行代价+足迹U-MPPI（Ch4）",
+     "mppi_memory": "时序记忆+双层代价FMM引导的足迹MPPI",
+     "astar_dwa": "A*+DWA",
+     "sapf": "SAPF",
+@@ -77,6 +86,14 @@ METHOD_PROVENANCE = {
+         "implementation": "HIMLoco NumPy adaptation with FMM corridor and Go2 footprint",
+         "official_author_code": False,
+     },
++    "umppi_trav": {
++        "paper": "ViPlanner-style semantic/geometric traversability cost + U-MPPI",
++        "implementation": (
++            "HIMLoco analytic continuous traversability-risk layer integrated "
++            "with dual-layer FMM and footprint U-MPPI"
++        ),
++        "official_author_code": False,
++    },
+     "sapf": {
+         "paper": "Safe Artificial Potential Field, IEEE RA-L 2023",
+         "implementation": "native NumPy occupancy-grid adaptation from the paper equations",
+@@ -110,6 +127,9 @@ SUMMARY_METRICS = {
+     "side_contact_steps": "side_contact_steps",
+     "stall_escape_count": "stall_escape_count",
+     "min_path_clearance_m": "min_path_clearance_m",
++    "traversability_path_mean": "traversability_path_mean",
++    "traversability_path_p95": "traversability_path_p95",
++    "traversability_path_max": "traversability_path_max",
+ }
+ 
+ 

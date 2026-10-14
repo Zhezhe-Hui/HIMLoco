@@ -33,6 +33,23 @@ METHODS = {
         "HIMLOCO_MPPI_VARIANT": "unscented",
         "HIMLOCO_FMM_SOFT_COST": "1",
         "HIMLOCO_TEMPORAL_MEMORY": "0",
+        "HIMLOCO_TRAVERSABILITY_COST": "0",
+    },
+    "umppi_trav": {
+        "HIMLOCO_PLANNER_MODE": "mppi",
+        "HIMLOCO_MPPI_VARIANT": "unscented",
+        "HIMLOCO_FMM_SOFT_COST": "1",
+        "HIMLOCO_TEMPORAL_MEMORY": "0",
+        "HIMLOCO_TRAVERSABILITY_COST": "1",
+        "HIMLOCO_TRAV_SOURCE": "analytic",
+    },
+    "umppi_trav_pred": {
+        "HIMLOCO_PLANNER_MODE": "mppi",
+        "HIMLOCO_MPPI_VARIANT": "unscented",
+        "HIMLOCO_FMM_SOFT_COST": "1",
+        "HIMLOCO_TEMPORAL_MEMORY": "0",
+        "HIMLOCO_TRAVERSABILITY_COST": "1",
+        "HIMLOCO_TRAV_SOURCE": "pred_cost",
     },
     "mppi_memory": {
         "HIMLOCO_PLANNER_MODE": "mppi",
@@ -63,6 +80,8 @@ METHOD_DISPLAY_NAMES = {
     "fmm_soft": "双层代价FMM",
     "mppi": "双层代价FMM引导的足迹MPPI",
     "umppi": "双层代价FMM引导的足迹U-MPPI（Ours）",
+    "umppi_trav": "连续可通行代价+足迹U-MPPI（Ch4）",
+    "umppi_trav_pred": "学习式可通行风险+足迹U-MPPI（Ch4主线）",
     "mppi_memory": "时序记忆+双层代价FMM引导的足迹MPPI",
     "astar_dwa": "A*+DWA",
     "sapf": "SAPF",
@@ -75,6 +94,22 @@ METHOD_PROVENANCE = {
         "paper": "U-MPPI, IEEE Transactions on Robotics 2025",
         "doi": "10.1109/TRO.2025.3526078",
         "implementation": "HIMLoco NumPy adaptation with FMM corridor and Go2 footprint",
+        "official_author_code": False,
+    },
+    "umppi_trav": {
+        "paper": "ViPlanner-style semantic/geometric traversability cost + U-MPPI",
+        "implementation": (
+            "HIMLoco analytic continuous traversability-risk layer integrated "
+            "with dual-layer FMM and footprint U-MPPI"
+        ),
+        "official_author_code": False,
+    },
+    "umppi_trav_pred": {
+        "paper": "ViPlanner-style learned traversability cost + U-MPPI",
+        "implementation": (
+            "RUGD-trained TinyUNet pred_cost replay adapter integrated with "
+            "dual-layer FMM and footprint U-MPPI"
+        ),
         "official_author_code": False,
     },
     "sapf": {
@@ -110,6 +145,9 @@ SUMMARY_METRICS = {
     "side_contact_steps": "side_contact_steps",
     "stall_escape_count": "stall_escape_count",
     "min_path_clearance_m": "min_path_clearance_m",
+    "traversability_path_mean": "traversability_path_mean",
+    "traversability_path_p95": "traversability_path_p95",
+    "traversability_path_max": "traversability_path_max",
 }
 
 

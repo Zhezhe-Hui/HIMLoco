@@ -1,0 +1,20 @@
+{
+  "dataset": "assets/datasets/rugd_traversability_train2_v1",
+  "train_samples": 51,
+  "val_samples": 13,
+  "device": "cuda",
+  "elapsed_sec": 6.650284767150879,
+  "best_miou": 0.19456195304101517,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.9443970115114003,
+      "loss": 1.090507329189251,
+      "pixel_acc": 0.3854700107416752,
+      "miou": 0.19456195304101517,
+      "iou_low": 0.0,
+      "iou_medium": 0.1924153703594172,
+      "iou_obstacle": 0.3912704887636283
+    }
+  ]
+}

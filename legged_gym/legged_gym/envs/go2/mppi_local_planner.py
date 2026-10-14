@@ -141,7 +141,8 @@ class FootprintMPPIController:
                  variant="standard", ut_alpha=1.0, ut_kappa=0.5,
                  ut_beta=2.0, ut_initial_position_var=0.001,
                  ut_initial_yaw_var=0.001, ut_risk_gamma=1.0,
-                 ut_smoothing_window=7):
+                 ut_smoothing_window=7,
+                 traversability_cost_weight=0.0):
         self.bev_res = float(bev_res)
         self.bev_x = float(bev_x)
         self.bev_y = float(bev_y)
@@ -167,8 +168,11 @@ class FootprintMPPIController:
         self.ut_initial_yaw_var = float(ut_initial_yaw_var)
         self.ut_risk_gamma = float(ut_risk_gamma)
         self.ut_smoothing_window = int(ut_smoothing_window)
+        self.traversability_cost_weight = float(traversability_cost_weight)
         if self.ut_alpha <= 0.0 or 3.0 + self.ut_kappa <= 0.0:
             raise ValueError("invalid unscented-transform scaling parameters")
+        if self.traversability_cost_weight < 0.0:
+            raise ValueError("traversability_cost_weight must be >= 0")
 
         length = float(footprint_length_m) + 2.0 * float(safety_margin_m)
         width = float(footprint_width_m) + 2.0 * float(safety_margin_m)
@@ -341,7 +345,8 @@ class FootprintMPPIController:
             hit[visible] |= np.asarray(occ_bev, dtype=bool)[rows[visible], cols[visible]]
         return np.any(hit, axis=1).reshape(original_shape)
 
-    def _trajectory_cost(self, states, controls, targets, occ_bev):
+    def _trajectory_cost(self, states, controls, targets, occ_bev,
+                         traversability_cost=None):
         error = states[:, :, :2] - targets[None, :, :]
         track_cost = 5.0 * np.sum(error * error, axis=(1, 2))
         terminal_error = states[:, -1, :2] - targets[-1]
@@ -363,13 +368,24 @@ class FootprintMPPIController:
         proximity = np.clip(0.65 - center_clearance, 0.0, 0.65) / 0.65
         proximity_cost = 18.0 * np.sum(proximity * proximity, axis=1)
 
+        terrain_cost = 0.0
+        if (traversability_cost is not None
+                and self.traversability_cost_weight > 0.0):
+            risk = np.asarray(traversability_cost, dtype=np.float32)
+            if risk.shape != (self.H, self.W):
+                raise ValueError("traversability_cost shape does not match MPPI BEV")
+            sampled_risk = risk[rows, cols]
+            terrain_cost = (
+                self.traversability_cost_weight
+                * np.sum(sampled_risk * sampled_risk, axis=1))
+
         du = np.diff(controls, axis=1)
         smooth_cost = (1.5 * np.sum(du[:, :, 0] ** 2, axis=1)
                        + 4.0 * np.sum(du[:, :, 1] ** 2, axis=1))
         effort_cost = (0.08 * np.sum((self.max_vx - controls[:, :, 0]) ** 2, axis=1)
                        + 0.35 * np.sum(controls[:, :, 1] ** 2, axis=1))
         return (track_cost + terminal_cost + heading_cost + collision_cost
-                + proximity_cost + smooth_cost + effort_cost), collision
+                + proximity_cost + terrain_cost + smooth_cost + effort_cost), collision
 
     def _risk_sensitive_tracking_cost(self, means, covariances, targets,
                                       track_weight, terminal_weight):
@@ -398,13 +414,15 @@ class FootprintMPPIController:
         return np.sum(running, axis=1) + terminal
 
     def _unscented_cost(self, sigma_states, mean_states, covariances,
-                        controls, targets, occ_bev, mean_weights):
+                        controls, targets, occ_bev, mean_weights,
+                        traversability_cost=None):
         batch_count, sigma_count = sigma_states.shape[:2]
         flat_states = sigma_states.reshape(
             batch_count * sigma_count, self.horizon, 3)
         repeated_controls = np.repeat(controls, sigma_count, axis=0)
         sigma_costs, sigma_collision = self._trajectory_cost(
-            flat_states, repeated_controls, targets, occ_bev)
+            flat_states, repeated_controls, targets, occ_bev,
+            traversability_cost=traversability_cost)
         sigma_costs = sigma_costs.reshape(batch_count, sigma_count)
         sigma_collision = sigma_collision.reshape(
             batch_count, sigma_count, self.horizon)
@@ -434,7 +452,8 @@ class FootprintMPPIController:
         smoothed[:, 1] = np.clip(smoothed[:, 1], -self.max_wz, self.max_wz)
         return smoothed
 
-    def _command_unscented(self, occ, targets, desired_heading):
+    def _command_unscented(self, occ, targets, desired_heading,
+                           traversability_cost=None):
         sigma_count = 7
         batch_count = max(2, self.num_samples // sigma_count)
         controls = self._sample_controls(desired_heading, count=batch_count)
@@ -442,7 +461,8 @@ class FootprintMPPIController:
             self._rollout_unscented(controls))
         costs, sigma_collision, _ = self._unscented_cost(
             sigma_states, mean_states, covariances,
-            controls, targets, occ, mean_weights)
+            controls, targets, occ, mean_weights,
+            traversability_cost=traversability_cost)
         finite = np.isfinite(costs)
         if not np.any(finite):
             return None
@@ -463,24 +483,30 @@ class FootprintMPPIController:
         self.last_state_covariance = covariances[best_idx].copy()
         return self._u[0].copy()
 
-    def command(self, occ_bev, path_xy, goal_xy=None):
+    def command(self, occ_bev, path_xy, goal_xy=None, traversability_cost=None):
         occ = np.asarray(occ_bev, dtype=np.uint8)
         if occ.shape != (self.H, self.W):
             raise ValueError("occ_bev shape does not match MPPI BEV")
+        risk = None
+        if traversability_cost is not None:
+            risk = np.asarray(traversability_cost, dtype=np.float32)
+            if risk.shape != (self.H, self.W):
+                raise ValueError("traversability_cost shape does not match MPPI BEV")
         targets = self._path_targets(path_xy)
         if not np.any(targets) and goal_xy is not None:
             targets[:] = np.asarray(goal_xy, dtype=np.float64)[:2]
         desired_heading = math.atan2(targets[min(3, self.horizon - 1), 1],
                                      max(0.05, targets[min(3, self.horizon - 1), 0]))
         if self.variant == "unscented":
-            cmd = self._command_unscented(occ, targets, desired_heading)
+            cmd = self._command_unscented(
+                occ, targets, desired_heading, traversability_cost=risk)
             if cmd is None:
                 return 0.0, 0.0
         else:
             controls = self._sample_controls(desired_heading)
             states = self._rollout(controls)
             costs, collision = self._trajectory_cost(
-                states, controls, targets, occ)
+                states, controls, targets, occ, traversability_cost=risk)
             finite = np.isfinite(costs)
             if not np.any(finite):
                 return 0.0, 0.0

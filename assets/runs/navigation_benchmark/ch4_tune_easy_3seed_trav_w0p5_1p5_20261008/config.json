@@ -1,0 +1,19 @@
+{
+  "scene": "random_corridor_easy",
+  "methods": [
+    "umppi_trav"
+  ],
+  "seed_start": 20261000,
+  "num_seeds": 3,
+  "vio": "ideal",
+  "python": "/home/fabu/miniconda3/envs/himloco/bin/python",
+  "git_commit": "809b829e9afcb21638dde0c370219f364435be27",
+  "git_dirty": true,
+  "method_provenance": {
+    "umppi_trav": {
+      "paper": "ViPlanner-style semantic/geometric traversability cost + U-MPPI",
+      "implementation": "HIMLoco analytic continuous traversability-risk layer integrated with dual-layer FMM and footprint U-MPPI",
+      "official_author_code": false
+    }
+  }
+}

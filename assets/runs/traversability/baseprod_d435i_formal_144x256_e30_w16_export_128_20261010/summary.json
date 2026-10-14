@@ -1,0 +1,658 @@
+{
+  "dataset": "assets/datasets/baseprod_traversability_framed",
+  "checkpoint": "assets/runs/traversability/baseprod_d435i_tinyunet_formal_144x256_e30_w16_20261009/best_model.pt",
+  "samples": 128,
+  "device": "cpu",
+  "height": 144,
+  "width": 256,
+  "width_mult": 16,
+  "metrics": {
+    "pixel_acc": 0.9465411246880674,
+    "miou": 0.7261626573132669,
+    "iou_low": 0.941496538269466,
+    "iou_medium": 0.7089575390983441,
+    "iou_obstacle": 0.5280338945719905
+  },
+  "records": [
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000000.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000000.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000000.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000001.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000001.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000001.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000002.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000002.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000002.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000003.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000003.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000003.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000004.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000004.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000004.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000005.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000005.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000005.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000006.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000006.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000006.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000007.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000007.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000007.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000008.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000008.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000008.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000009.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000009.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000009.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000010.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000010.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000010.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000011.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000011.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000011.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000012.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000012.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000012.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000013.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000013.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000013.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000014.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000014.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000014.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000015.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000015.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000015.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000016.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000016.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000016.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000017.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000017.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000017.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000018.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000018.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000018.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000019.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000019.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000019.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000020.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000020.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000020.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000021.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000021.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000021.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000022.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000022.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000022.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000023.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000023.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000023.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000024.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000024.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000024.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000025.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000025.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000025.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000026.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000026.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000026.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000027.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000027.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000027.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000028.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000028.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000028.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000029.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000029.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000029.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000030.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000030.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000030.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000031.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000031.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000031.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000032.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000032.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000032.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000033.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000033.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000033.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000034.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000034.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000034.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000035.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000035.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000035.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000036.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000036.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000036.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000037.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000037.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000037.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000038.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000038.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000038.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000039.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000039.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000039.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000040.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000040.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000040.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000041.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000041.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000041.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000042.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000042.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000042.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000043.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000043.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000043.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000044.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000044.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000044.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000045.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000045.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000045.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000046.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000046.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000046.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000047.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000047.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000047.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000048.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000048.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000048.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000049.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000049.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000049.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000050.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000050.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000050.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000051.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000051.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000051.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000052.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000052.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000052.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000053.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000053.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000053.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000054.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000054.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000054.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000055.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000055.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000055.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000056.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000056.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000056.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000057.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000057.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000057.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000058.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000058.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000058.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000059.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000059.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000059.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000060.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000060.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000060.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000061.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000061.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000061.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000062.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000062.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000062.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000063.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000063.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000063.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000064.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000064.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000064.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000065.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000065.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000065.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000066.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000066.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000066.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000067.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000067.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000067.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000068.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000068.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000068.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000069.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000069.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000069.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000070.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000070.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000070.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000071.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000071.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000071.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000072.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000072.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000072.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000073.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000073.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000073.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000074.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000074.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000074.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000075.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000075.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000075.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000076.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000076.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000076.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000077.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000077.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000077.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000078.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000078.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000078.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000079.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000079.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000079.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000080.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000080.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000080.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000081.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000081.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000081.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000082.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000082.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000082.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000083.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000083.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000083.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000084.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000084.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000084.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000085.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000085.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000085.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000086.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000086.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000086.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000087.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000087.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000087.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000088.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000088.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000088.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000089.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000089.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000089.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000090.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000090.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000090.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000091.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000091.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000091.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000092.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000092.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000092.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000093.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000093.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000093.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000094.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000094.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000094.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000095.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000095.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000095.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000096.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000096.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000096.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000097.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000097.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000097.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000098.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000098.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000098.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000099.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000099.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000099.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000100.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000100.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000100.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000101.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000101.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000101.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000102.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000102.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000102.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000103.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000103.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000103.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000104.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000104.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000104.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000105.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000105.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000105.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000106.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000106.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000106.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000107.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000107.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000107.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000108.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000108.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000108.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000109.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000109.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000109.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000110.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000110.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000110.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000111.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000111.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000111.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000112.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000112.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000112.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000113.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000113.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000113.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000114.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000114.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000114.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000115.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000115.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000115.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000116.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000116.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000116.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000117.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000117.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000117.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000118.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000118.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000118.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000119.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000119.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000119.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000120.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000120.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000120.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000121.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000121.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000121.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000122.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000122.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000122.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000123.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000123.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000123.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000124.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000124.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000124.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000125.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000125.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000125.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000126.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000126.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000126.png"
+    },
+    {
+      "rgb": "/mnt/data/HIMLoco_storage/datasets/baseprod_traversability_framed/rgb/000127.jpg",
+      "pred_label": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_label/000127.png",
+      "pred_cost": "assets/runs/traversability/baseprod_d435i_formal_144x256_e30_w16_export_128_20261010/pred_cost/000127.png"
+    }
+  ]
+}

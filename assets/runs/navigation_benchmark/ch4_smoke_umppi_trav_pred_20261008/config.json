@@ -1,0 +1,19 @@
+{
+  "scene": "random_corridor_easy",
+  "methods": [
+    "umppi_trav_pred"
+  ],
+  "seed_start": 20261000,
+  "num_seeds": 1,
+  "vio": "ideal",
+  "python": "/home/fabu/miniconda3/envs/himloco/bin/python",
+  "git_commit": "809b829e9afcb21638dde0c370219f364435be27",
+  "git_dirty": true,
+  "method_provenance": {
+    "umppi_trav_pred": {
+      "paper": "ViPlanner-style learned traversability cost + U-MPPI",
+      "implementation": "RUGD-trained TinyUNet pred_cost replay adapter integrated with dual-layer FMM and footprint U-MPPI",
+      "official_author_code": false
+    }
+  }
+}

@@ -1,0 +1,4 @@
+failure_reason,method,method_display_name,process_returncode,seed,success
+process_error,umppi_trav_pred,学习式可通行风险+足迹U-MPPI（Ch4主线）,1,20261000,False
+process_error,umppi_trav_pred,学习式可通行风险+足迹U-MPPI（Ch4主线）,1,20261001,False
+process_error,umppi_trav_pred,学习式可通行风险+足迹U-MPPI（Ch4主线）,1,20261002,False

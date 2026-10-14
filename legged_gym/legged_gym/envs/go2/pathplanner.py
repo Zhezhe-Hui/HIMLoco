@@ -27,6 +27,7 @@ from legged_gym.envs.go2.mppi_local_planner import (
     WorldObstacleMemory,
     choose_safer_turn_sign,
 )
+from legged_gym.envs.go2.learned_traversability import PredCostTraversabilityProvider
 from legged_gym.envs.go2.simulated_vio import SimulatedVIO, wrap_angle
 
 # =====================================================================
@@ -191,6 +192,23 @@ class Evaluator:
             clip_invalid_eps=BEV_CLIP_INVALID_EPS,
             min_range=BEV_MIN_RANGE_M,
         )
+        self.learned_traversability = None
+        if TRAVERSABILITY_COST_ENABLE and TRAVERSABILITY_COST_SOURCE == "pred_cost":
+            self.learned_traversability = PredCostTraversabilityProvider(
+                TRAVERSABILITY_PRED_COST_DIR,
+                bev_shape=(self.bev.H, self.bev.W),
+                update_interval=TRAVERSABILITY_PRED_COST_INTERVAL,
+                flip_vertical=TRAVERSABILITY_PRED_COST_FLIP_VERTICAL,
+                flip_horizontal=TRAVERSABILITY_PRED_COST_FLIP_HORIZONTAL,
+                obstacle_cost=TRAVERSABILITY_OBSTACLE_COST,
+            )
+            print("[traversability] source=pred_cost dir=%s files=%d"
+                  % (self.learned_traversability.cost_dir,
+                     len(self.learned_traversability.files)))
+        elif TRAVERSABILITY_COST_ENABLE and TRAVERSABILITY_COST_SOURCE != "analytic":
+            raise ValueError(
+                "unknown TRAVERSABILITY_COST_SOURCE=%r; expected analytic or pred_cost"
+                % TRAVERSABILITY_COST_SOURCE)
         self.last_occ = None
         # 前向净空速度调制的限幅状态（上一个实际下发的 cmd_vx）。
         # 每个 trial 开始时重置回全速，避免把上一轮末尾的低速带进新一轮。
@@ -200,6 +218,8 @@ class Evaluator:
         self.trial_narrow_steps = 0
         self.trial_min_path_clearance = float("inf")
         self.trial_memory_max_points = 0
+        self.trial_traversability_path_mean = []
+        self.trial_traversability_path_max = []
         self.mode = mode
         self.mppi = None
         if self.mode in ('fmm', 'mppi'):
@@ -215,6 +235,9 @@ class Evaluator:
                 soft_clearance_m=FMM_SOFT_CLEARANCE_M,
                 soft_cost_weight=FMM_SOFT_COST_WEIGHT,
                 soft_cost_power=FMM_SOFT_COST_POWER,
+                traversability_cost_weight=(
+                    FMM_TRAVERSABILITY_COST_WEIGHT
+                    if TRAVERSABILITY_COST_ENABLE else 0.0),
                 # 转向决策锁存：压住对称鞍点处 wz 的逐步振荡（见 viz_config.FMM_TURN_*）
                 hysteresis_thresh=(FMM_TURN_HYSTERESIS_THRESH
                                    if FMM_TURN_HYSTERESIS_ENABLE else 0.0),
@@ -251,6 +274,9 @@ class Evaluator:
                     ut_initial_yaw_var=U_MPPI_INITIAL_YAW_VAR,
                     ut_risk_gamma=U_MPPI_RISK_GAMMA,
                     ut_smoothing_window=U_MPPI_SMOOTHING_WINDOW,
+                    traversability_cost_weight=(
+                        MPPI_TRAVERSABILITY_COST_WEIGHT
+                        if TRAVERSABILITY_COST_ENABLE else 0.0),
                 )
         elif self.mode == 'rrt':
             self.fmm = RRTController(
@@ -373,6 +399,8 @@ class Evaluator:
         self.trial_narrow_steps = 0
         self.trial_min_path_clearance = float("inf")
         self.trial_memory_max_points = 0
+        self.trial_traversability_path_mean = []
+        self.trial_traversability_path_max = []
         initial_true_pose = (
             float(self.env.root_states[0, 0].item()),
             float(self.env.root_states[0, 1].item()),
@@ -395,6 +423,8 @@ class Evaluator:
         self.temporal_memory.reset()
         if self.mppi is not None:
             self.mppi.reset()
+        if self.learned_traversability is not None:
+            self.learned_traversability.reset(trial_id)
         self._mppi_active = False
         self._cached_mppi_cmd = (float(NAV_FORWARD_VX), 0.0)
         self._cached_raw_path = []
@@ -478,6 +508,17 @@ class Evaluator:
             else:
                 occ_bev = occ_bev_now
 
+            traversability_cost = None
+            if TRAVERSABILITY_COST_ENABLE:
+                if self.learned_traversability is not None:
+                    traversability_cost = self.learned_traversability.get_cost(
+                        step=step, occ_bev=occ_bev)
+                else:
+                    traversability_cost = self.bev.get_traversability_cost(
+                        occ_bev=occ_bev,
+                        unknown_cost=TRAVERSABILITY_UNKNOWN_COST,
+                        obstacle_cost=TRAVERSABILITY_OBSTACLE_COST)
+
             # 3) 计算 waypoint 在机器人坐标（goal_xy_bev）
             wp = self.planner.waypoints[self.planner.current_id]
             dx_w = wp[0] - nav_x
@@ -501,7 +542,11 @@ class Evaluator:
                 if self.mode == 'iplanner':
                     self.fmm.set_depth(self._last_depth_pos)
                 start_plan_t = time.time()
-                self.fmm.update(occ_bev)
+                if self.mode in ('fmm', 'mppi'):
+                    self.fmm.update(
+                        occ_bev, traversability_cost=traversability_cost)
+                else:
+                    self.fmm.update(occ_bev)
                 self.trial_step_times.append((time.time() - start_plan_t) * 1000)
                 self._cached_raw_path = self.fmm.extract_path()
                 if hasattr(self.fmm, "is_reachable"):
@@ -523,6 +568,18 @@ class Evaluator:
                 raw_xy.append([wx, wy])
             raw_xy = np.array(raw_xy)
             self._record_trial_fmm_segment(step, raw_xy)
+            if traversability_cost is not None and raw_path:
+                risk_values = [
+                    float(traversability_cost[r, col])
+                    for r, col in raw_path
+                    if 0 <= r < traversability_cost.shape[0]
+                    and 0 <= col < traversability_cost.shape[1]
+                ]
+                if risk_values:
+                    self.trial_traversability_path_mean.append(
+                        float(np.mean(risk_values)))
+                    self.trial_traversability_path_max.append(
+                        float(np.max(risk_values)))
 
             # ===== 4. 保存 =====
             if step == 0: 
@@ -549,7 +606,8 @@ class Evaluator:
                         ], dtype=np.float64)
                         start_mppi_t = time.time()
                         self._cached_mppi_cmd = self.mppi.command(
-                            occ_bev, local_path_xy, goal_xy=(dx_r, dy_r))
+                            occ_bev, local_path_xy, goal_xy=(dx_r, dy_r),
+                            traversability_cost=traversability_cost)
                         mppi_ms = (time.time() - start_mppi_t) * 1000.0
                         if self.trial_step_times:
                             self.trial_step_times[-1] += mppi_ms
@@ -2095,6 +2153,10 @@ class Evaluator:
         yaw = np.asarray(self.trial_vio_yaw_errors, dtype=np.float64)
         plan = np.asarray(self.trial_step_times, dtype=np.float64)
         smooth = np.asarray(self.trial_step_smoothness, dtype=np.float64)
+        trav_mean = np.asarray(
+            self.trial_traversability_path_mean, dtype=np.float64)
+        trav_max = np.asarray(
+            self.trial_traversability_path_max, dtype=np.float64)
         record = {
             "success": bool(success),
             "failure_reason": str(reason),
@@ -2105,6 +2167,15 @@ class Evaluator:
             "temporal_memory": bool(self._use_temporal_memory),
             "soft_cost": (bool(FMM_USE_SOFT_COST)
                           if self.mode in ('fmm', 'mppi') else None),
+            "traversability_cost": bool(TRAVERSABILITY_COST_ENABLE),
+            "traversability_source": (
+                TRAVERSABILITY_COST_SOURCE if TRAVERSABILITY_COST_ENABLE else None),
+            "traversability_fmm_weight": (
+                float(FMM_TRAVERSABILITY_COST_WEIGHT)
+                if TRAVERSABILITY_COST_ENABLE else 0.0),
+            "traversability_mppi_weight": (
+                float(MPPI_TRAVERSABILITY_COST_WEIGHT)
+                if TRAVERSABILITY_COST_ENABLE else 0.0),
             "actor_truth_whitelist": bool(BEV_OBSTACLE_ACTORS_ONLY),
             "vio_noise_level": VIO_NOISE_LEVEL,
             "elapsed_s": float(elapsed_time),
@@ -2112,6 +2183,12 @@ class Evaluator:
             "planning_mean_ms": float(plan.mean()) if plan.size else 0.0,
             "planning_p95_ms": float(np.percentile(plan, 95)) if plan.size else 0.0,
             "path_smoothness_mean": float(smooth.mean()) if smooth.size else None,
+            "traversability_path_mean": (
+                float(trav_mean.mean()) if trav_mean.size else None),
+            "traversability_path_p95": (
+                float(np.percentile(trav_mean, 95)) if trav_mean.size else None),
+            "traversability_path_max": (
+                float(trav_max.max()) if trav_max.size else None),
             "energy_torque_sq_mean": float(metrics["energy"]),
             "cmd_wz_variation": float(metrics["cmd_wz_variation"]),
             "cmd_wz_sign_flips": int(metrics["cmd_wz_sign_flips"]),

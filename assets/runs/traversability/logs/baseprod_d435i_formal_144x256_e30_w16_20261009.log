@@ -1,0 +1,162 @@
+nohup: 忽略输入
+cached train 100/760
+cached train 200/760
+cached train 300/760
+cached train 400/760
+cached train 500/760
+cached train 600/760
+cached train 700/760
+cached train 760/760
+cached val 100/190
+cached val 190/190
+epoch=01 batch=020/095 train_loss=0.8941
+epoch=01 batch=040/095 train_loss=0.8154
+epoch=01 batch=060/095 train_loss=0.7791
+epoch=01 batch=080/095 train_loss=0.7477
+epoch=01 train_loss=0.7272 val_loss=0.6272 acc=0.717 miou=0.441 iou=[0.614, 0.513, 0.197]
+epoch=02 batch=020/095 train_loss=0.6292
+epoch=02 batch=040/095 train_loss=0.6011
+epoch=02 batch=060/095 train_loss=0.5894
+epoch=02 batch=080/095 train_loss=0.5892
+epoch=02 train_loss=0.5810 val_loss=0.4545 acc=0.817 miou=0.525 iou=[0.783, 0.577, 0.215]
+epoch=03 batch=020/095 train_loss=0.5440
+epoch=03 batch=040/095 train_loss=0.5448
+epoch=03 batch=060/095 train_loss=0.5344
+epoch=03 batch=080/095 train_loss=0.5235
+epoch=03 train_loss=0.5291 val_loss=0.5412 acc=0.771 miou=0.456 iou=[0.758, 0.393, 0.216]
+epoch=04 batch=020/095 train_loss=0.4852
+epoch=04 batch=040/095 train_loss=0.4947
+epoch=04 batch=060/095 train_loss=0.4878
+epoch=04 batch=080/095 train_loss=0.4939
+epoch=04 train_loss=0.4902 val_loss=0.5512 acc=0.744 miou=0.491 iou=[0.644, 0.550, 0.278]
+epoch=05 batch=020/095 train_loss=0.4401
+epoch=05 batch=040/095 train_loss=0.4360
+epoch=05 batch=060/095 train_loss=0.4496
+epoch=05 batch=080/095 train_loss=0.4445
+epoch=05 train_loss=0.4476 val_loss=0.5024 acc=0.799 miou=0.537 iou=[0.731, 0.612, 0.267]
+epoch=06 batch=020/095 train_loss=0.4060
+epoch=06 batch=040/095 train_loss=0.4057
+epoch=06 batch=060/095 train_loss=0.3944
+epoch=06 batch=080/095 train_loss=0.4054
+epoch=06 train_loss=0.4087 val_loss=0.4546 acc=0.807 miou=0.565 iou=[0.738, 0.618, 0.338]
+epoch=07 batch=020/095 train_loss=0.3891
+epoch=07 batch=040/095 train_loss=0.3910
+epoch=07 batch=060/095 train_loss=0.3947
+epoch=07 batch=080/095 train_loss=0.4005
+epoch=07 train_loss=0.3920 val_loss=0.4206 acc=0.818 miou=0.523 iou=[0.810, 0.524, 0.237]
+epoch=08 batch=020/095 train_loss=0.4200
+epoch=08 batch=040/095 train_loss=0.4161
+epoch=08 batch=060/095 train_loss=0.3953
+epoch=08 batch=080/095 train_loss=0.3931
+epoch=08 train_loss=0.3917 val_loss=0.4725 acc=0.809 miou=0.520 iou=[0.800, 0.609, 0.152]
+epoch=09 batch=020/095 train_loss=0.3479
+epoch=09 batch=040/095 train_loss=0.3599
+epoch=09 batch=060/095 train_loss=0.3670
+epoch=09 batch=080/095 train_loss=0.3703
+epoch=09 train_loss=0.3684 val_loss=0.3210 acc=0.867 miou=0.645 iou=[0.822, 0.692, 0.420]
+epoch=10 batch=020/095 train_loss=0.3424
+epoch=10 batch=040/095 train_loss=0.3274
+epoch=10 batch=060/095 train_loss=0.3420
+epoch=10 batch=080/095 train_loss=0.3512
+epoch=10 train_loss=0.3511 val_loss=0.4474 acc=0.814 miou=0.514 iou=[0.811, 0.546, 0.186]
+epoch=11 batch=020/095 train_loss=0.3608
+epoch=11 batch=040/095 train_loss=0.3613
+epoch=11 batch=060/095 train_loss=0.3520
+epoch=11 batch=080/095 train_loss=0.3445
+epoch=11 train_loss=0.3384 val_loss=0.2941 acc=0.876 miou=0.634 iou=[0.850, 0.691, 0.360]
+epoch=12 batch=020/095 train_loss=0.3115
+epoch=12 batch=040/095 train_loss=0.3269
+epoch=12 batch=060/095 train_loss=0.3444
+epoch=12 batch=080/095 train_loss=0.3378
+epoch=12 train_loss=0.3386 val_loss=0.2969 acc=0.873 miou=0.634 iou=[0.839, 0.694, 0.369]
+epoch=13 batch=020/095 train_loss=0.2990
+epoch=13 batch=040/095 train_loss=0.3163
+epoch=13 batch=060/095 train_loss=0.3208
+epoch=13 batch=080/095 train_loss=0.3227
+epoch=13 train_loss=0.3143 val_loss=0.3887 acc=0.832 miou=0.548 iou=[0.830, 0.622, 0.193]
+epoch=14 batch=020/095 train_loss=0.3055
+epoch=14 batch=040/095 train_loss=0.2873
+epoch=14 batch=060/095 train_loss=0.2867
+epoch=14 batch=080/095 train_loss=0.2859
+epoch=14 train_loss=0.2887 val_loss=0.2680 acc=0.887 miou=0.676 iou=[0.853, 0.723, 0.454]
+epoch=15 batch=020/095 train_loss=0.2690
+epoch=15 batch=040/095 train_loss=0.2719
+epoch=15 batch=060/095 train_loss=0.2883
+epoch=15 batch=080/095 train_loss=0.2931
+epoch=15 train_loss=0.2906 val_loss=0.3063 acc=0.879 miou=0.637 iou=[0.847, 0.720, 0.345]
+epoch=16 batch=020/095 train_loss=0.2798
+epoch=16 batch=040/095 train_loss=0.2693
+epoch=16 batch=060/095 train_loss=0.2699
+epoch=16 batch=080/095 train_loss=0.2782
+epoch=16 train_loss=0.2771 val_loss=0.3090 acc=0.878 miou=0.644 iou=[0.851, 0.705, 0.376]
+epoch=17 batch=020/095 train_loss=0.2566
+epoch=17 batch=040/095 train_loss=0.2610
+epoch=17 batch=060/095 train_loss=0.2727
+epoch=17 batch=080/095 train_loss=0.2787
+epoch=17 train_loss=0.2948 val_loss=0.4636 acc=0.821 miou=0.557 iou=[0.789, 0.517, 0.365]
+epoch=18 batch=020/095 train_loss=0.3166
+epoch=18 batch=040/095 train_loss=0.3017
+epoch=18 batch=060/095 train_loss=0.2978
+epoch=18 batch=080/095 train_loss=0.2893
+epoch=18 train_loss=0.2893 val_loss=0.3649 acc=0.838 miou=0.560 iou=[0.837, 0.626, 0.218]
+epoch=19 batch=020/095 train_loss=0.2900
+epoch=19 batch=040/095 train_loss=0.2719
+epoch=19 batch=060/095 train_loss=0.2600
+epoch=19 batch=080/095 train_loss=0.2584
+epoch=19 train_loss=0.2544 val_loss=0.2561 acc=0.901 miou=0.693 iou=[0.872, 0.739, 0.468]
+epoch=20 batch=020/095 train_loss=0.2594
+epoch=20 batch=040/095 train_loss=0.2632
+epoch=20 batch=060/095 train_loss=0.2558
+epoch=20 batch=080/095 train_loss=0.2540
+epoch=20 train_loss=0.2540 val_loss=0.2928 acc=0.879 miou=0.643 iou=[0.852, 0.713, 0.365]
+epoch=21 batch=020/095 train_loss=0.2474
+epoch=21 batch=040/095 train_loss=0.2373
+epoch=21 batch=060/095 train_loss=0.2297
+epoch=21 batch=080/095 train_loss=0.2302
+epoch=21 train_loss=0.2552 val_loss=1.9247 acc=0.686 miou=0.308 iou=[0.669, 0.150, 0.104]
+epoch=22 batch=020/095 train_loss=0.3743
+epoch=22 batch=040/095 train_loss=0.3347
+epoch=22 batch=060/095 train_loss=0.2973
+epoch=22 batch=080/095 train_loss=0.3025
+epoch=22 train_loss=0.2966 val_loss=0.2530 acc=0.892 miou=0.668 iou=[0.864, 0.739, 0.401]
+epoch=23 batch=020/095 train_loss=0.2195
+epoch=23 batch=040/095 train_loss=0.2287
+epoch=23 batch=060/095 train_loss=0.2270
+epoch=23 batch=080/095 train_loss=0.2233
+epoch=23 train_loss=0.2261 val_loss=0.2568 acc=0.893 miou=0.693 iou=[0.856, 0.745, 0.479]
+epoch=24 batch=020/095 train_loss=0.2272
+epoch=24 batch=040/095 train_loss=0.2229
+epoch=24 batch=060/095 train_loss=0.2136
+epoch=24 batch=080/095 train_loss=0.2177
+epoch=24 train_loss=0.2181 val_loss=0.2507 acc=0.901 miou=0.690 iou=[0.875, 0.741, 0.453]
+epoch=25 batch=020/095 train_loss=0.2020
+epoch=25 batch=040/095 train_loss=0.1890
+epoch=25 batch=060/095 train_loss=0.2001
+epoch=25 batch=080/095 train_loss=0.2073
+epoch=25 train_loss=0.2075 val_loss=0.2714 acc=0.886 miou=0.639 iou=[0.873, 0.724, 0.321]
+epoch=26 batch=020/095 train_loss=0.1872
+epoch=26 batch=040/095 train_loss=0.1958
+epoch=26 batch=060/095 train_loss=0.2098
+epoch=26 batch=080/095 train_loss=0.2091
+epoch=26 train_loss=0.2053 val_loss=0.2700 acc=0.893 miou=0.676 iou=[0.861, 0.749, 0.419]
+epoch=27 batch=020/095 train_loss=0.1895
+epoch=27 batch=040/095 train_loss=0.1822
+epoch=27 batch=060/095 train_loss=0.1760
+epoch=27 batch=080/095 train_loss=0.1771
+epoch=27 train_loss=0.1782 val_loss=0.2539 acc=0.898 miou=0.671 iou=[0.873, 0.756, 0.385]
+epoch=28 batch=020/095 train_loss=0.1823
+epoch=28 batch=040/095 train_loss=0.1740
+epoch=28 batch=060/095 train_loss=0.1700
+epoch=28 batch=080/095 train_loss=0.1686
+epoch=28 train_loss=0.1694 val_loss=0.2210 acc=0.913 miou=0.722 iou=[0.888, 0.775, 0.502]
+epoch=29 batch=020/095 train_loss=0.1582
+epoch=29 batch=040/095 train_loss=0.1682
+epoch=29 batch=060/095 train_loss=0.1764
+epoch=29 batch=080/095 train_loss=0.1776
+epoch=29 train_loss=0.1777 val_loss=0.2441 acc=0.904 miou=0.698 iou=[0.874, 0.769, 0.450]
+epoch=30 batch=020/095 train_loss=0.1514
+epoch=30 batch=040/095 train_loss=0.1536
+epoch=30 batch=060/095 train_loss=0.1586
+epoch=30 batch=080/095 train_loss=0.1619
+epoch=30 train_loss=0.1612 val_loss=0.2502 acc=0.907 miou=0.694 iou=[0.885, 0.762, 0.436]
+Wrote assets/runs/traversability/baseprod_d435i_tinyunet_formal_144x256_e30_w16_20261009

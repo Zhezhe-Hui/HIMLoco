@@ -1,0 +1,5 @@
+experiment,success_rate,successes_trials,elapsed_s,planning_ms,path_risk_mean,path_risk_p95,notes
+RUGD pred_cost,1.000,3/3,35.52,13.03,0.633,0.749,learning risk closed loop smoke
+BASEPROD 4epoch weighted pred_cost,1.000,3/3,37.07,14.87,0.024,0.109,D435i closed loop smoke
+BASEPROD 30epoch formal default weight,0.667,2/3,34.49,15.78,0.078,0.219,one timeout
+BASEPROD 30epoch formal low weight,0.000,0/3,,,,two stuck and one timeout
