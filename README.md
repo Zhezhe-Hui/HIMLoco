@@ -87,3 +87,7 @@ This work is under the <a rel="license" href="http://creativecommons.org/license
 
 ## 👏 Acknowledgements
 - [legged_gym](https://github.com/leggedrobotics/legged_gym): Our codebase is built upon legged_gym.
+
+## GO2 实机网页与部署
+
+网页服务源码：`go2_web/`；感知规划与机器狗接口：`go2_runtime/`；部署工具：`deploy/`。使用说明与现场测试计划见 [GO2 文档](docs/go2/README.md)。

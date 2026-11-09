@@ -1,0 +1,7 @@
+{
+  "calibrated": false,
+  "note": "UNMEASURED placeholders: shadow diagnostics only. Measure camera pose and standing base height before execution.",
+  "camera_translation_body_m": [0.30, 0.0, 0.25],
+  "camera_rotation_optical_to_body": [[0, 0, 1], [-1, 0, 0], [0, -1, 0]],
+  "standing_base_height_m": 0.278
+}

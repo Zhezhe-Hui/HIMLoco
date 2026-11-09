@@ -1,0 +1,30 @@
+[Unit]
+Description=GO2 onboard RGB-D and ours experiment console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=unitree
+Group=unitree
+WorkingDirectory=/home/unitree/himloco-runtime
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=MPLBACKEND=Agg
+Environment=MPLCONFIGDIR=/home/unitree/himloco-runtime/go2_web/data/matplotlib
+Environment=PYTHONPATH=/home/unitree/himloco-runtime/go2_runtime/.deps
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+ExecStart=/usr/bin/python3 -S /home/unitree/himloco-runtime/go2_web/server.py --board --autoconnect --interface eth0 --bind 0.0.0.0 --allow-interface-addresses --camera-local /home/unitree/himloco-runtime/go2_runtime/build/camera_stream
+Restart=on-failure
+RestartSec=3
+KillMode=control-group
+TimeoutStopSec=8
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/unitree/himloco-runtime/go2_web/data /home/unitree/himloco-runtime/go2_runtime/runs
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GO2 · 视觉导航实验台</title>
+  <meta name="description" content="GO2 视觉导航实验台：实时感知、局部规划与实验回放。">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-view="workspace" data-workspace-pane="perception">
+  <aside class="sidebar">
+    <a class="brand" href="#workspace"><span class="brand-mark">G</span><span>GO2<small>ROBOTICS LAB</small></span></a>
+    <div class="platform"><span class="robot-mini">⌁</span><div>Unitree Go2 EDU<small>D435i · RGB-D 感知</small></div></div>
+    <div class="nav-label">实验空间</div>
+    <nav aria-label="主导航">
+      <button class="nav-item active" data-view="workspace"><span>▦</span>实验工作台</button>
+      <button class="nav-item" data-view="records"><span>▤</span>实验记录<b id="navCount">0</b></button>
+      <button class="nav-item" data-view="environment"><span>⚙</span>参数与环境</button>
+    </nav>
+    <div class="sidebar-bottom"><div class="connection"><i></i><span id="sidebarConnection">有线开发 · 连接状态见顶部</span></div><p><span id="sidebarCompute">电脑运行感知与规划</span><br>实际执行须现场手动启动</p><div class="version">GO2 <span>视觉导航实验台</span></div></div>
+  </aside>
+
+  <div class="shell">
+    <header class="topbar"><div class="breadcrumb">GO2 <span>/</span> <strong id="breadcrumb">工作台</strong></div><div class="top-actions"><span class="badge offline" id="runtimeBadge"><i></i>离线控制</span><span id="clock" class="clock">--:--:--</span><button class="text-button logout-button" id="logout" hidden>退出</button><button class="stop-button" id="stopTask" disabled><span>■</span>停止任务</button></div></header>
+    <main>
+      <section class="view active" id="view-workspace">
+        <div class="page-heading"><div><div class="eyebrow">PERCEPTION · PLANNING · CONTROL</div><h1>视觉导航实验台</h1><p>双层代价 FMM 引导的标准足迹 MPPI</p></div><div class="heading-actions"><button class="camera-connect" id="connectCamera" disabled>连接实时相机（只读）</button><button class="camera-connect" id="disconnectCamera" hidden>断开相机</button><button class="camera-connect" id="captureCamera" disabled title="保存同一实时帧的RGB和深度到电脑桌面">截图到桌面</button><span class="method-tag">OURS <span>384 × 20</span></span></div></div>
+        <div class="notice"><span class="notice-icon">i</span><div><strong id="modeNotice">历史回放模式</strong><span id="modeDescription">使用已保存的实机数据。页面操作不会向机器狗发送指令。</span></div><span class="notice-lock">启动前检查标定与输入</span></div>
+
+        <div class="workspace-tabs" role="tablist" aria-label="工作台区域">
+          <button role="tab" aria-selected="true" data-pane="perception">感知与规划</button>
+          <button role="tab" aria-selected="false" data-pane="controls">测试配置</button>
+          <button role="tab" aria-selected="false" data-pane="telemetry">状态与遥测</button>
+        </div>
+        <div class="workspace-grid">
+          <div class="visual-column">
+            <div class="camera-grid">
+              <section class="panel camera-panel"><div class="panel-head"><h2>RGB 画面</h2><span class="badge muted" id="rgbSourceBadge">定格快照</span></div><div class="camera-frame"><img id="rgbImage" alt="相机RGB画面，来源见标签"><span class="camera-caption" id="rgbCaption">历史数据 · 非实时视频</span></div></section>
+              <section class="panel camera-panel"><div class="panel-head"><h2>深度画面</h2><span class="subtle" id="depthSourceBadge">0–4 m</span></div><div class="camera-frame"><img id="depthImage" alt="相机深度画面，来源见标签"><span class="camera-caption" id="depthCaption">蓝 → 近 / 暖色 → 远 · 黑色无效</span></div></section>
+            <div class="metrics status-strip" aria-label="紧凑运行摘要">
+              <article class="metric"><div class="metric-label">地图 / 遥测来源 <span>◉</span></div><div class="metric-value small" id="metricSource">历史实机数据</div><div class="metric-foot" id="metricSourceFoot">只读回放</div></article>
+              <article class="metric"><div class="metric-label" id="metricPlanLabel">规划耗时 · P95 <span>↗</span></div><div class="metric-value"><span id="metricPlan">—</span><small>ms</small></div><div class="metric-foot" id="metricPlanFoot">原始运行统计</div></article>
+              <article class="metric"><div class="metric-label">建议 / 本体速度 <span>⇢</span></div><div class="metric-value dual"><span id="metricProposed">—</span><em>/</em><span id="metricActual">—</span><small>m/s</small></div><div class="metric-foot" id="metricSpeedFoot">所选历史时刻</div></article>
+              <article class="metric"><div class="metric-label"><span id="commandLabel">速度桥写入</span> <span>◇</span></div><div class="metric-value"><span class="green" id="commandCount">0</span><small>条</small></div><div class="metric-foot"><span id="commandFoot">只读规划不发送速度</span></div></article>
+            </div>
+            </div>
+            <section class="panel scene-panel">
+              <div class="panel-head"><div><span class="panel-dot blue"></span><h2>局部感知与规划</h2><span class="subtle">6 × 6 m</span></div><div class="segmented" aria-label="地图图层"><button class="active" data-layer="obstacles">障碍地图</button><button data-layer="cost">软代价层</button></div></div>
+              <div class="map-wrap"><canvas id="bevCanvas" aria-label="局部BEV地图与FMM、MPPI轨迹"></canvas><div class="map-chip" id="mapMode">历史定格快照</div><div class="map-compass">↑ 前方 <span>← 左侧</span></div><div class="map-scale">1 m <span></span></div><div class="map-empty" id="mapEmpty" hidden>该实验没有留存地图快照</div></div>
+              <div class="map-legend"><span><i class="legend-block obstacle"></i>几何障碍</span><span><i class="legend-line path"></i>FMM 路径</span><span><i class="legend-line mppi"></i>MPPI 候选</span><span><i class="legend-block robot"></i>机器人</span><span class="map-detail" id="mapDetail">等待数据</span></div>
+            </section>
+            <section class="panel replay-panel">
+              <div class="source-row"><div class="source-tabs" aria-label="数据模式"><button id="liveMode" hidden>实机实时</button><button class="active" id="historyMode">历史回放</button><button id="simulationMode">流程模拟</button></div><select id="runSelect" aria-label="选择历史实验"></select></div>
+              <div class="replay-controls"><button class="play-button" id="playReplay" aria-label="播放历史遥测">▶</button><input type="range" id="timeline" min="0" max="0" value="0" aria-label="历史遥测时间轴"><span class="timecode" id="replayTime">00.0 / 00.0 s</span><button class="text-button" id="replayRate" aria-label="切换回放速度">1×</button></div>
+              <p class="tiny" id="replayHint">时间轴回放遥测；图像和地图来自最近留存快照，不是连续录像。</p>
+            </section>
+          </div>
+
+          <div class="control-column">
+            <section class="panel controls-panel"><div class="panel-head"><h2>测试配置</h2><span class="badge blue" id="controlScope">仅模拟</span></div><div class="panel-body">
+              <div class="form-heading">局部目标 <span>启动时机身坐标系 · 米</span></div>
+              <div class="field-grid"><label>前方距离<div class="input-unit"><input id="forward" type="number" min="0.3" max="5" step="0.1" value="0.5"><span>m</span></div></label><label>左侧偏移<div class="input-unit"><input id="lateral" type="number" min="-2" max="2" step="0.1" value="0"><span>m</span></div></label></div>
+              <div class="form-heading secondary">运行限制</div>
+              <div class="field-grid"><label>速度上限<div class="input-unit"><input id="max_vx" type="number" min="0.01" max="0.20" step="0.01" value="0.10"><span>m/s</span></div></label><label>最长时长<div class="input-unit"><input id="duration" type="number" min="1" max="60" step="1" value="5"><span>s</span></div></label></div>
+              <div class="draft-row"><span id="draftStatus">前方+X，左侧+Y</span><button class="text-button" id="openCalibration">标定</button><button class="text-button" id="saveDraft">保存参数</button></div>
+              <div id="realActions" hidden><button class="primary-button" id="startRealShadow">开始真实影子规划</button><button class="secondary-button" id="openExecute">实际测试 / 手柄接管…</button></div>
+              <div id="simulationActions"><button class="primary-button" id="startSimulation"><span>▷</span>开始模拟测试</button><button class="secondary-button" id="startShadow">模拟影子规划流程</button></div>
+              <div class="task-state" id="taskState"><span class="task-icon">○</span><div><strong id="taskTitle">等待模拟任务</strong><small id="taskMessage">不运行真实规划器或机器人接口</small></div><span id="taskElapsed">—</span></div><div class="progress-track"><div id="taskProgress"></div></div>
+              <label class="record-switch" id="simulationRecording"><input type="checkbox" id="recording" checked><span class="toggle"></span><span>记录模拟遥测<small>仅记录生成数据，非实机录包</small></span><i id="recordLight"></i></label>
+              <label class="record-switch" id="realRecording" hidden><input type="checkbox" id="recordRGBD"><span class="toggle"></span><span>保存 RGB-D 采样<small>2 Hz 原始快照；遥测每规划帧记录</small></span></label>
+            </div></section>
+            <section class="panel telemetry-panel"><div class="panel-head"><h2>速度遥测</h2><span class="subtle" id="chartMode">历史记录</span></div><div class="chart-wrap"><canvas id="speedCanvas" aria-label="建议速度与本体速度曲线"></canvas></div><div class="chart-legend"><span><i class="legend-line path"></i>建议速度</span><span><i class="legend-line mppi"></i>本体速度</span></div><div class="telemetry-list"><div><span>运动模式 / 步态</span><strong id="motionState">— / —</strong></div><div><span>指令记录 / 拦截原因</span><strong id="reasonValue">—</strong></div><div><span>采集数据年龄上界</span><strong id="ageValue">—</strong></div></div></section>
+            <div class="integrity-note"><span>◇</span><p>影子规划不发速度。写入速度桥不等于真实迈步；里程计到达需现场核验。</p></div>
+          </div>
+        </div>
+
+      </section>
+
+      <section class="view" id="view-records"><div class="page-heading"><div><div class="eyebrow">EXPERIMENT ARCHIVE</div><h1>实验记录</h1><p>历史实机记录与离线生成数据分开标记，保留失败与中止结果。</p></div><button class="secondary-button compact" id="refreshRecords">刷新记录</button></div><div class="panel"><div class="panel-head"><h2>全部实验</h2><input class="search-input" id="recordSearch" placeholder="搜索实验名称或编号" aria-label="搜索实验记录"></div><div class="table-scroll"><table><thead><tr><th>实验名称 / 编号</th><th>来源</th><th>时长 / 样本</th><th>结果</th><th>操作</th></tr></thead><tbody id="allRows"></tbody></table></div></div><p class="page-note">真实速度试验的“程序正常结束”不等于“导航成功”。首次试验现场反馈为未迈步，已单独标记。</p></section>
+
+      <section class="view" id="view-environment"><div class="page-heading"><div><div class="eyebrow">RUNTIME & PARAMETERS</div><h1>参数与环境</h1><p>有线链路、相机外参和真实规划配置。</p></div><span class="badge offline" id="deploymentBadge">正在读取</span></div><div class="environment-grid"><section class="panel calibration-panel"><div class="panel-head"><h2>相机与机身标定</h2><span class="badge offline" id="calibrationBadge">初步值，未完整确认</span></div><div class="panel-body"><p class="page-note">测量 D435i 深度镜头中点相对机身中心的位置。地面拟合无法测出前后/左右位置和安装偏航，估计值不能直接当成完整标定。</p><div class="calibration-fields"><label>前向位置（m）<input id="calForward" type="number" value="0.34" min="0.1" max="0.6" step="0.001"></label><label>左向位置（m）<input id="calLeft" type="number" value="0" min="-0.25" max="0.25" step="0.001"></label><label>安装偏航（°，左转为正）<input id="calYaw" type="number" value="0" min="-30" max="30" step="0.1"></label></div><label class="cal-check"><input id="xyMeasured" type="checkbox">以上前后/左右位置已实际测量，不是估计</label><label class="cal-check"><input id="yawConfirmed" type="checkbox">已核对相机朝向及安装偏航</label><div class="calibration-buttons"><button class="secondary-button compact" id="saveCalibration">保存测量</button><button class="secondary-button compact" id="fitGround">静态地面复核</button><button class="secondary-button compact" id="approveCalibration">确认完整标定</button></div><p id="calibrationMessage" class="page-note">先连接实机，再在水平地面静止站立至少2秒。</p><pre id="calibrationValues" class="cal-values"></pre></div></section><section class="panel"><div class="panel-head"><h2>运行环境</h2></div><dl class="environment-list"><div><dt>服务位置</dt><dd id="serviceLocation">正在读取</dd></div><div><dt>运行模式</dt><dd class="green" id="environmentMode">正在读取</dd></div><div><dt>运动接口</dt><dd id="motionInterface">尚未创建</dd></div><div><dt>数据连接</dt><dd id="dataConnection">历史 / 模拟；相机可实时只读</dd></div><div><dt>任务与参数存储</dt><dd>服务端 SQLite</dd></div><div><dt>原始实机数据</dt><dd>原历史只读；新任务单独保存</dd></div><div><dt>图像留存</dt><dd>预览不录制；任务可选2Hz原始RGB-D</dd></div></dl></section><section class="panel"><div class="panel-head"><h2>ours 配置</h2><span class="badge blue">参考配置</span></div><dl class="environment-list"><div><dt>局部规划器</dt><dd>标准足迹 MPPI</dd></div><div><dt>FMM 代价</dt><dd>硬碰撞层 + 连续软安全层</dd></div><div><dt>采样数 / 预测步数</dt><dd>384 / 20</dd></div><div><dt>预测步长</dt><dd>0.10 s</dd></div><div><dt>BEV 分辨率</dt><dd>0.05 m</dd></div><div><dt>硬半径 / 软影响距离</dt><dd>0.20 / 0.65 m</dd></div><div><dt>相机外参</dt><dd class="amber">初步标定，仍需验证</dd></div></dl></section></div><section class="panel environment-note"><h2>局部目标与测试范围</h2><p>目标用启动时机身坐标设置：前方为正X，左侧为正Y。启动后固定到本体里程计坐标系，不会每帧向前推移。它是局部目标，不是全局地图导航。首次实际试验仅支持前方0.3–0.5米、侧向0、速度≤0.10m/s、时长≤5秒；原地/近障停车不受最低非停车采样速度影响。初步标定必须单独确认，完整标定仍需实际测量。切换页面、页面失联或输入过期会终止执行；遥控器仍需现场接管。</p></section></section>
+      <footer><span>GO2 · Chapter 03 Experiment Console</span><span>LOCAL FIRST <i>·</i> OFFLINE SAFE</span></footer>
+    </main>
+  </div>
+  <dialog id="executeDialog"><h2>实际测试</h2><label>测试类型 <select id="executeProfile"><option value="takeover">手柄接管 · 0.30 m/s</option><option value="short">普通短距离 · 原限速</option></select></label><label id="takeoverDurationRow">接管测试上限（4–8秒） <input id="takeoverDuration" type="number" min="4" max="8" step="1" value="8"></label><p class="page-note" id="remoteReadout"></p><p id="executeSummary"></p><p>这一步会让机器狗移动。不会自动站立或切换运动模式；请使用遥控器让狗正常站立，保持空旷区域并可随时接管。</p><label class="cal-check"><input id="operatorConfirmed" type="checkbox">已在现场，狗已站稳，空间空旷，可随时遥控接管</label><label class="cal-check" id="preliminaryRow"><input id="preliminaryAck" type="checkbox">我知道标定仍含估计值，仅进行上述受限初步试验</label><label class="cal-check" id="remoteVerifiedRow"><input id="remoteVerified" type="checkbox">已在只读状态核对手柄数据随操作变化；现在摇杆归中、按键松开，前方至少4米空旷</label><p id="executeReadiness"></p><div class="calibration-buttons"><button class="secondary-button compact" id="cancelExecute">取消</button><button class="primary-button" id="confirmExecute">启动本次实际试验</button></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>

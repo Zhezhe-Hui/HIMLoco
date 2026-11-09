@@ -1,0 +1,5 @@
+numpy
+scipy
+matplotlib
+scikit-image
+scikit-fmm==2025.6.23

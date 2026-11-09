@@ -6,7 +6,6 @@ import skfmm
 from numpy import ma
 import skimage.morphology as morph
 from scipy.ndimage import distance_transform_edt
-from legged_gym.envs.go2.go2_config import Go2RoughCfg
 import matplotlib.image as mpimg
 import glob
 import os
@@ -959,6 +958,7 @@ def bezier_smooth(path, num_segments, samples_per_seg=20):
     return np.array(smooth)
 
 def plot_all_trials(trajs, goals, raw_paths=None, save_path=None):
+    from legged_gym.envs.go2.go2_config import Go2RoughCfg
 
     plt.figure(figsize=(10,8))
     # ===== 轨迹 =====
@@ -993,6 +993,7 @@ def plot_all_trials(trajs, goals, raw_paths=None, save_path=None):
     plt.close()   
 
 def plot_all_saved_trajectories(folder_path, goal_xy_all, save_path=None):
+    from legged_gym.envs.go2.go2_config import Go2RoughCfg
     # 读取所有保存的轨迹
     traj_files = sorted(glob.glob(os.path.join(folder_path, "traj_*.npy")))
     all_trajs = [np.load(f) for f in traj_files]
